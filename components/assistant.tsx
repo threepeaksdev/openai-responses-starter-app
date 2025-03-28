@@ -12,7 +12,7 @@ export default function Assistant() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuth();
   const { currentConversationId, createNewConversation } = useConversationsStore();
-  const { chatMessages, addConversationItem } = useConversationStore();
+  const { chatMessages, addConversationItem, addChatMessage } = useConversationStore();
   const { addMessage, fetchMessages } = useMessages(currentConversationId || '');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -39,20 +39,31 @@ export default function Assistant() {
     try {
       setIsProcessing(true);
 
-      // Add message to local state and Supabase simultaneously
-      const userMessage = {
+      // Create message for chat display
+      const chatMessage = {
+        type: "message" as const,
         role: "user" as const,
-        content: message.trim(),
+        content: [{
+          type: "input_text" as const,
+          text: message.trim()
+        }]
+      };
+
+      // Create message for conversation store
+      const conversationMessage = {
+        role: "user" as const,
+        content: message.trim()
       };
       
-      addConversationItem(userMessage);
+      addChatMessage(chatMessage);
+      addConversationItem(conversationMessage);
       await addMessage(message.trim(), 'user');
       await processMessages();
 
       // After AI responds, add the response to Supabase
       const lastMessage = chatMessages[chatMessages.length - 1];
-      if (lastMessage && 'content' in lastMessage && typeof lastMessage.content === 'string') {
-        await addMessage(lastMessage.content, 'assistant');
+      if (lastMessage?.type === 'message' && lastMessage.content?.[0]?.text) {
+        await addMessage(lastMessage.content[0].text, 'assistant');
       }
     } catch (error) {
       console.error("Error processing message:", error);

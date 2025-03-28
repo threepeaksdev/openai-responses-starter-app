@@ -1,4 +1,3 @@
-import { Contact } from '@/types/supabase'
 import { supabase } from "@/lib/supabase"
 
 interface CreateContactParams {
@@ -49,7 +48,7 @@ export const handleCreateContact = async (params: CreateContactParams) => {
 
     // Only include fields that have actual values
     const contactData = Object.fromEntries(
-      Object.entries(params).filter(([_, value]) => {
+      Object.entries(params).filter(([key, value]) => {
         if (Array.isArray(value)) {
           return value.length > 0;
         }

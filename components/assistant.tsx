@@ -13,7 +13,7 @@ export default function Assistant() {
   const { user, loading: authLoading } = useSupabaseAuth();
   const { currentConversationId, createNewConversation } = useConversationsStore();
   const { chatMessages, addConversationItem, addChatMessage } = useConversationStore();
-  const { messages, loading: messagesLoading, addMessage, fetchMessages } = useMessages(
+  const { messages: _, loading: __, addMessage, fetchMessages } = useMessages(
     currentConversationId || ''
   );
   const [isProcessing, setIsProcessing] = useState(false);

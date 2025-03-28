@@ -9,7 +9,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { signIn, signUp } = useSupabaseAuth();
+  const { signIn, signUp, signInWithGithub } = useSupabaseAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,8 +27,9 @@ export default function AuthPage() {
       }
 
       router.push('/');
-    } catch (err) {
-      setError('An unexpected error occurred');
+    } catch {
+      // Handle error silently - user probably just cancelled
+      return
     }
   };
 

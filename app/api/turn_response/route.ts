@@ -1,7 +1,6 @@
 import { MODEL } from "@/config/constants";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { Item } from "@/lib/assistant";
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {

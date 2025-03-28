@@ -24,6 +24,11 @@ interface EditTaskParams {
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
 }
 
+interface GetTasksParams {
+  task_id?: string
+  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+}
+
 export async function handleManageTasks(params: ManageTasksParams) {
   const { action, taskId, status, task } = params
   const baseUrl = '/api/functions/tasks'
@@ -202,4 +207,48 @@ export const handleEditTask = async (params: EditTaskParams) => {
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
-}; 
+};
+
+export const handleGetTasks = async (params: GetTasksParams) => {
+  try {
+    // Get the authenticated user
+    const { data: userData, error: authError } = await supabase.auth.getUser()
+    if (authError || !userData.user) {
+      throw new Error('User not authenticated')
+    }
+
+    // Start building the query
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .eq('user_id', userData.user.id)
+
+    // Add filters based on provided parameters
+    if (params.task_id) {
+      query = query.eq('id', params.task_id)
+    }
+
+    if (params.status) {
+      query = query.eq('status', params.status)
+    }
+
+    // Execute the query
+    const { data, error } = await query.order('created_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    return {
+      success: true,
+      tasks: data,
+      count: data.length
+    }
+  } catch (error) {
+    console.error('Error retrieving tasks:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    }
+  }
+} 

@@ -1,7 +1,8 @@
 // Functions mapping to tool calls
 // Define one function per tool call - each tool call should have a matching function
 // Parameters for a tool call are passed as an object to the corresponding function
-import { handleCreateTask, handleEditTask } from "@/app/api/functions/tasks/handler";
+import { handleCreateTask, handleEditTask, handleGetTasks } from "@/app/api/functions/tasks/handler";
+import { handleCreateContact, handleUpdateContact, handleGetContacts } from "@/app/api/functions/contacts/handler";
 
 export const get_weather = async ({
   location,
@@ -26,12 +27,23 @@ export const get_joke = async () => {
   return res;
 };
 
+export const create_contact = handleCreateContact;
+
 export const create_task = handleCreateTask;
 export const edit_task = handleEditTask;
+
+export const edit_contact = handleUpdateContact;
+
+export const get_contacts = handleGetContacts;
+export const get_tasks = handleGetTasks;
 
 export const functionsMap = {
   get_weather,
   get_joke,
+  create_contact,
   create_task,
   edit_task,
+  edit_contact,
+  get_contacts,
+  get_tasks,
 };

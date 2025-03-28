@@ -9,9 +9,10 @@ import { Item } from "@/lib/assistant";
 interface ChatProps {
   items: Item[];
   onSendMessage: (message: string) => void;
+  isProcessing?: boolean;
 }
 
-const Chat: React.FC<ChatProps> = ({ items, onSendMessage }) => {
+const Chat: React.FC<ChatProps> = ({ items, onSendMessage, isProcessing = false }) => {
   const itemsEndRef = useRef<HTMLDivElement>(null);
   const [inputMessageText, setinputMessageText] = useState<string>("");
   // This state is used to provide better user experience for non-English IMEs such as Japanese
@@ -22,12 +23,12 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage }) => {
   };
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey && !isComposing) {
+    if (event.key === "Enter" && !event.shiftKey && !isComposing && !isProcessing) {
       event.preventDefault();
       onSendMessage(inputMessageText);
       setinputMessageText("");
     }
-  }, [onSendMessage, inputMessageText]);
+  }, [onSendMessage, inputMessageText, isProcessing, isComposing]);
 
   useEffect(() => {
     scrollToBottom();
@@ -70,17 +71,18 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage }) => {
                       tabIndex={0}
                       dir="auto"
                       rows={2}
-                      placeholder="Message..."
+                      placeholder={isProcessing ? "Processing..." : "Message..."}
                       className="mb-2 resize-none border-0 focus:outline-none text-sm bg-transparent px-0 pb-6 pt-2"
                       value={inputMessageText}
                       onChange={(e) => setinputMessageText(e.target.value)}
                       onKeyDown={handleKeyDown}
                       onCompositionStart={() => setIsComposing(true)}
                       onCompositionEnd={() => setIsComposing(false)}
+                      disabled={isProcessing}
                     />
                   </div>
                   <button
-                    disabled={!inputMessageText}
+                    disabled={!inputMessageText || isProcessing}
                     data-testid="send-button"
                     className="flex size-8 items-end justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100"
                     onClick={() => {

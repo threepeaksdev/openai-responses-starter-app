@@ -23,4 +23,41 @@ export const toolsList = [
     description: "Get a programming joke",
     parameters: {},
   },
+  {
+    name: "create_task",
+    description: "Create a simple task",
+    parameters: {
+      title: {
+        type: "string",
+        description: "Title of the task",
+      },
+      description: {
+        type: "string",
+        description: "Description of the task",
+      },
+    },
+  },
+  {
+    name: "edit_task",
+    description: "Edit an existing task",
+    parameters: {
+      task_id: {
+        type: "string",
+        description: "ID of the task to edit",
+      },
+      title: {
+        type: "string",
+        description: "New title of the task",
+      },
+      description: {
+        type: "string",
+        description: "New description of the task",
+      },
+      status: {
+        type: "string",
+        description: "New status of the task",
+        enum: ["pending", "in_progress", "completed", "cancelled"],
+      },
+    },
+  },
 ];

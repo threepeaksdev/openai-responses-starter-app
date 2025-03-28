@@ -1,0 +1,60 @@
+{
+  "name": "manage_tasks",
+  "description": "Manage tasks for the user. This function can create, read, update, and delete tasks.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["create", "read", "update", "delete"],
+        "description": "The action to perform on tasks"
+      },
+      "taskId": {
+        "type": "string",
+        "description": "The ID of the task (required for update and delete actions)"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["pending", "in_progress", "completed", "cancelled"],
+        "description": "Filter tasks by status (for read action) or set task status (for create/update actions)"
+      },
+      "task": {
+        "type": "object",
+        "description": "Task data for create or update actions",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "A detailed description of the task"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "cancelled"],
+            "description": "The status of the task"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The due date for the task in ISO 8601 format"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "The priority level of the task"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of tags associated with the task"
+          }
+        }
+      }
+    },
+    "required": ["action"]
+  }
+} 

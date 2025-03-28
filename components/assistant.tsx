@@ -12,7 +12,7 @@ export default function Assistant() {
   const router = useRouter();
   const { user, loading: authLoading } = useSupabaseAuth();
   const { currentConversationId, createNewConversation } = useConversationsStore();
-  const { chatMessages, addConversationItem, addChatMessage } = useConversationStore();
+  const { chatMessages, addConversationItem } = useConversationStore();
   const { addMessage, fetchMessages } = useMessages(currentConversationId || '');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -51,7 +51,7 @@ export default function Assistant() {
 
       // After AI responds, add the response to Supabase
       const lastMessage = chatMessages[chatMessages.length - 1];
-      if (lastMessage?.role === 'assistant' && typeof lastMessage.content === 'string') {
+      if (lastMessage && 'content' in lastMessage && typeof lastMessage.content === 'string') {
         await addMessage(lastMessage.content, 'assistant');
       }
     } catch (error) {

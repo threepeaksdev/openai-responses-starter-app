@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Chat from "./chat";
 import useConversationStore from "@/stores/useConversationStore";
-import { Item, processMessages } from "@/lib/assistant";
+import { processMessages } from "@/lib/assistant";
 import { useSupabaseAuth } from "@/lib/hooks/useSupabaseAuth";
 import { useMessages } from "@/lib/hooks/useMessages";
 import useConversationsStore from "@/stores/useConversationsStore";
@@ -13,9 +13,7 @@ export default function Assistant() {
   const { user, loading: authLoading } = useSupabaseAuth();
   const { currentConversationId, createNewConversation } = useConversationsStore();
   const { chatMessages, addConversationItem, addChatMessage } = useConversationStore();
-  const { messages: _, loading: __, addMessage, fetchMessages } = useMessages(
-    currentConversationId || ''
-  );
+  const { addMessage, fetchMessages } = useMessages(currentConversationId || '');
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
@@ -38,34 +36,23 @@ export default function Assistant() {
   const handleSendMessage = async (message: string) => {
     if (!message.trim() || !currentConversationId || isProcessing) return;
 
-    const userItem: Item = {
-      type: "message",
-      role: "user",
-      content: [{ type: "input_text", text: message.trim() }],
-    };
-    const userMessage: any = {
-      role: "user",
-      content: message.trim(),
-    };
-
     try {
       setIsProcessing(true);
 
       // Add message to local state and Supabase simultaneously
+      const userMessage = {
+        role: "user" as const,
+        content: message.trim(),
+      };
+      
       addConversationItem(userMessage);
-      addChatMessage(userItem);
-      const addMessagePromise = addMessage(message.trim(), 'user');
-
-      // Process the message with the AI while the message is being added to Supabase
-      await Promise.all([addMessagePromise, processMessages()]);
+      await addMessage(message.trim(), 'user');
+      await processMessages();
 
       // After AI responds, add the response to Supabase
       const lastMessage = chatMessages[chatMessages.length - 1];
-      if (lastMessage && lastMessage.type === 'message' && lastMessage.role === 'assistant') {
-        const assistantContent = lastMessage.content[0].text;
-        if (assistantContent) {
-          await addMessage(assistantContent, 'assistant');
-        }
+      if (lastMessage?.role === 'assistant' && typeof lastMessage.content === 'string') {
+        await addMessage(lastMessage.content, 'assistant');
       }
     } catch (error) {
       console.error("Error processing message:", error);
@@ -74,7 +61,6 @@ export default function Assistant() {
     }
   };
 
-  // Only show loading on initial auth check
   if (authLoading) {
     return <div className="h-full p-4 w-full bg-white flex items-center justify-center">Loading...</div>;
   }

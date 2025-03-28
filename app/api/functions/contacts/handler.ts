@@ -48,7 +48,7 @@ export const handleCreateContact = async (params: CreateContactParams) => {
 
     // Only include fields that have actual values
     const contactData = Object.fromEntries(
-      Object.entries(params).filter(([key, value]) => {
+      Object.entries(params).filter(([_, value]) => {
         if (Array.isArray(value)) {
           return value.length > 0;
         }

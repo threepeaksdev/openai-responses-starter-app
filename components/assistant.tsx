@@ -73,7 +73,7 @@ export default function Assistant() {
   };
 
   if (authLoading) {
-    return <div className="h-full p-4 w-full bg-white flex items-center justify-center">Loading...</div>;
+    return <div className="h-full flex items-center justify-center">Loading...</div>;
   }
 
   if (!user) {
@@ -81,7 +81,7 @@ export default function Assistant() {
   }
 
   return (
-    <div className="h-full p-4 w-full bg-white">
+    <div className="h-full flex flex-col bg-white">
       <Chat 
         items={chatMessages} 
         onSendMessage={handleSendMessage}

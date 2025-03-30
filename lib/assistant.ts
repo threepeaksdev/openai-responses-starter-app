@@ -297,9 +297,14 @@ export const processMessages = async () => {
           // Record tool output
           toolCallMessage.output = JSON.stringify(toolResult);
           setChatMessages([...chatMessages]);
+
+          // Ensure we have a call_id before adding the output
+          const call_id = toolCallMessage.call_id || item_id;
+          toolCallMessage.call_id = call_id;
+
           conversationItems.push({
             type: "function_call_output",
-            call_id: toolCallMessage.call_id,
+            call_id,
             status: "completed",
             output: JSON.stringify(toolResult),
           });

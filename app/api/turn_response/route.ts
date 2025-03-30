@@ -14,8 +14,7 @@ export async function POST(request: Request) {
       if (message.type === 'function_call_output') {
         return {
           type: 'function_call_output',
-          call_id: message.call_id || uuidv4(),
-          name: message.name,
+          call_id: message.call_id,
           output: message.output,
           status: message.status || 'completed'
         };
@@ -23,10 +22,11 @@ export async function POST(request: Request) {
       
       // For tool calls
       if (message.type === 'tool_call') {
+        const call_id = message.call_id || message.id || uuidv4();
         return {
           type: 'function_call',
           id: message.id,
-          call_id: message.call_id || message.id || uuidv4(),
+          call_id,
           name: message.name,
           arguments: message.arguments,
           status: message.status || 'completed'
@@ -36,6 +36,30 @@ export async function POST(request: Request) {
       // For regular messages, keep them as is
       return message;
     });
+
+    // Validate that all function call outputs have matching function calls
+    const functionCalls = formattedMessages.filter((m: any) => m.type === 'function_call') as Array<{
+      type: 'function_call';
+      id: string;
+      call_id: string;
+      name: string;
+      arguments: string;
+      status: string;
+    }>;
+    
+    const functionOutputs = formattedMessages.filter((m: any) => m.type === 'function_call_output') as Array<{
+      type: 'function_call_output';
+      call_id: string;
+      output: string;
+      status: string;
+    }>;
+    
+    for (const output of functionOutputs) {
+      const matchingCall = functionCalls.find(call => call.call_id === output.call_id);
+      if (!matchingCall) {
+        console.warn(`No matching function call found for output with call_id ${output.call_id}`);
+      }
+    }
 
     const openai = new OpenAI();
 

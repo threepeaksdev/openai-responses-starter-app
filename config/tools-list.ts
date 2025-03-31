@@ -244,7 +244,7 @@ export const toolsList = [
   },
   {
     name: "get_contacts",
-    description: "Search and retrieve contacts from the user's contact list. You can search using natural language queries like 'Do I know someone named Dave?' or 'Who works at ABC Inc?'. The search looks across names, nicknames, companies, occupations, locations, emails, and bios. Only use relationship_status parameter when specifically asked about a type of relationship (e.g. 'Show me all my friends' or 'List my colleagues').",
+    description: "Search and retrieve contacts from the user's contact list. You can search using natural language queries like 'Do I know someone named Dave?' or 'Who works at ABC Inc?'. The search looks across names, nicknames, companies, occupations, locations, emails, and bios.",
     parameters: {
       contact_id: {
         type: "string",
@@ -252,12 +252,7 @@ export const toolsList = [
       },
       search_term: {
         type: "string",
-        description: "Optional: Search term to find contacts. Can be a name, company, occupation, location, or any other identifying information. For example: 'Dave', 'ABC Inc', 'engineer', 'New York'. For relationship queries like 'Who is Dave to me?', just search for 'Dave' without specifying a relationship_status."
-      },
-      relationship_status: {
-        type: "string",
-        description: "Optional: Only use when explicitly filtering for a specific relationship type. For example, use this for queries like 'Show me all my friends' but NOT for queries like 'Who is Dave to me?'",
-        enum: ["friend", "family", "colleague", "acquaintance", "other"]
+        description: "Optional: Search term to find contacts. Can be a name, company, occupation, location, or any other identifying information. For example: 'Dave', 'ABC Inc', 'engineer', 'New York'."
       }
     }
   },

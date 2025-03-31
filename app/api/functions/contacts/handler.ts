@@ -30,7 +30,6 @@ interface UpdateContactParams extends Partial<CreateContactParams> {
 interface GetContactsParams {
   contact_id?: string
   search_term?: string
-  relationship_status?: 'friend' | 'family' | 'colleague' | 'acquaintance' | 'other'
 }
 
 export const handleCreateContact = async (params: CreateContactParams) => {
@@ -152,25 +151,10 @@ export const handleGetContacts = async (params: GetContactsParams) => {
       query = query.eq('id', params.contact_id)
     }
 
-    // Only apply relationship filter if explicitly provided
-    if (params.relationship_status) {
-      query = query.eq('relationship_status', params.relationship_status)
-    }
-
     if (params.search_term) {
       const searchTerm = params.search_term.toLowerCase()
-      // Search across multiple fields using OR conditions
       query = query.or(
-        `first_name.ilike.%${searchTerm}%,` +
-        `last_name.ilike.%${searchTerm}%,` +
-        `nickname.ilike.%${searchTerm}%,` +
-        `company.ilike.%${searchTerm}%,` +
-        `occupation.ilike.%${searchTerm}%,` +
-        `location.ilike.%${searchTerm}%,` +
-        `email.ilike.%${searchTerm}%,` +
-        `bio.ilike.%${searchTerm}%,` +
-        `met_through.ilike.%${searchTerm}%,` +
-        `met_at.ilike.%${searchTerm}%`
+        `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%,company.ilike.%${searchTerm}%,occupation.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,bio.ilike.%${searchTerm}%,met_through.ilike.%${searchTerm}%,met_at.ilike.%${searchTerm}%`
       )
     }
 
@@ -185,9 +169,6 @@ export const handleGetContacts = async (params: GetContactsParams) => {
     const contacts = data.map(contact => {
       // Build relationship info
       const relationshipInfo = [];
-      if (contact.relationship_status) {
-        relationshipInfo.push(contact.relationship_status);
-      }
       if (contact.met_through) {
         relationshipInfo.push(`met through ${contact.met_through}`);
       }
@@ -201,7 +182,7 @@ export const handleGetContacts = async (params: GetContactsParams) => {
         display_info: [
           [contact.first_name, contact.last_name].filter(Boolean).join(' '),
           contact.nickname ? `(${contact.nickname})` : null,
-          relationshipInfo.length > 0 ? `is a ${relationshipInfo.join(', ')}` : null,
+          relationshipInfo.length > 0 ? relationshipInfo.join(', ') : null,
           contact.company ? `works at ${contact.company}` : null,
           contact.occupation ? `as ${contact.occupation}` : null,
           contact.location ? `in ${contact.location}` : null
@@ -216,17 +197,11 @@ export const handleGetContacts = async (params: GetContactsParams) => {
       if (params.search_term) {
         summary += ` matching "${params.search_term}"`;
       }
-      if (params.relationship_status) {
-        summary += ` with relationship status "${params.relationship_status}"`;
-      }
       summary += '.';
     } else {
       summary = 'No contacts found';
       if (params.search_term) {
         summary += ` matching "${params.search_term}"`;
-      }
-      if (params.relationship_status) {
-        summary += ` with relationship status "${params.relationship_status}"`;
       }
       summary += '.';
     }

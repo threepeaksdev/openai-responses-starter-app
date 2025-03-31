@@ -109,7 +109,7 @@ export const handleUpdateNote = async (params: UpdateNoteParams) => {
 
     // Filter out undefined, null, and empty string values
     const updateData = Object.fromEntries(
-      Object.entries(updateFields).filter(([_, value]) => {
+      Object.entries(updateFields).filter(([key, value]) => {
         if (value === undefined || value === null) return false;
         if (typeof value === 'string' && value.trim() === '') return false;
         if (Array.isArray(value) && value.length === 0) return false;

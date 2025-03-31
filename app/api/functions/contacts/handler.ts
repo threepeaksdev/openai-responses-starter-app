@@ -152,13 +152,26 @@ export const handleGetContacts = async (params: GetContactsParams) => {
       query = query.eq('id', params.contact_id)
     }
 
+    // Only apply relationship filter if explicitly provided
     if (params.relationship_status) {
       query = query.eq('relationship_status', params.relationship_status)
     }
 
     if (params.search_term) {
       const searchTerm = params.search_term.toLowerCase()
-      query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,nickname.ilike.%${searchTerm}%`)
+      // Search across multiple fields using OR conditions
+      query = query.or(
+        `first_name.ilike.%${searchTerm}%,` +
+        `last_name.ilike.%${searchTerm}%,` +
+        `nickname.ilike.%${searchTerm}%,` +
+        `company.ilike.%${searchTerm}%,` +
+        `occupation.ilike.%${searchTerm}%,` +
+        `location.ilike.%${searchTerm}%,` +
+        `email.ilike.%${searchTerm}%,` +
+        `bio.ilike.%${searchTerm}%,` +
+        `met_through.ilike.%${searchTerm}%,` +
+        `met_at.ilike.%${searchTerm}%`
+      )
     }
 
     // Execute the query
@@ -168,10 +181,61 @@ export const handleGetContacts = async (params: GetContactsParams) => {
       throw error
     }
 
+    // Format the results to be more natural language friendly
+    const contacts = data.map(contact => {
+      // Build relationship info
+      const relationshipInfo = [];
+      if (contact.relationship_status) {
+        relationshipInfo.push(contact.relationship_status);
+      }
+      if (contact.met_through) {
+        relationshipInfo.push(`met through ${contact.met_through}`);
+      }
+      if (contact.met_at) {
+        relationshipInfo.push(`met at ${contact.met_at}`);
+      }
+
+      return {
+        ...contact,
+        full_name: [contact.first_name, contact.last_name].filter(Boolean).join(' '),
+        display_info: [
+          [contact.first_name, contact.last_name].filter(Boolean).join(' '),
+          contact.nickname ? `(${contact.nickname})` : null,
+          relationshipInfo.length > 0 ? `is a ${relationshipInfo.join(', ')}` : null,
+          contact.company ? `works at ${contact.company}` : null,
+          contact.occupation ? `as ${contact.occupation}` : null,
+          contact.location ? `in ${contact.location}` : null
+        ].filter(Boolean).join(' ')
+      };
+    });
+
+    // Create a natural language summary
+    let summary = '';
+    if (contacts.length > 0) {
+      summary = `Found ${contacts.length} contact${contacts.length === 1 ? '' : 's'}`;
+      if (params.search_term) {
+        summary += ` matching "${params.search_term}"`;
+      }
+      if (params.relationship_status) {
+        summary += ` with relationship status "${params.relationship_status}"`;
+      }
+      summary += '.';
+    } else {
+      summary = 'No contacts found';
+      if (params.search_term) {
+        summary += ` matching "${params.search_term}"`;
+      }
+      if (params.relationship_status) {
+        summary += ` with relationship status "${params.relationship_status}"`;
+      }
+      summary += '.';
+    }
+
     return {
       success: true,
-      contacts: data,
-      count: data.length
+      contacts,
+      count: contacts.length,
+      summary
     }
   } catch (error) {
     console.error('Error retrieving contacts:', error)

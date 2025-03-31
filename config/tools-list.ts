@@ -275,5 +275,146 @@ export const toolsList = [
         enum: ["pending", "in_progress", "completed", "cancelled"]
       }
     }
+  },
+  {
+    name: "create_note",
+    description: "Create a new note that can be standalone or related to a contact, task, or project",
+    parameters: {
+      title: {
+        type: "string",
+        description: "Title of the note"
+      },
+      content: {
+        type: "string",
+        description: "Content of the note"
+      },
+      contact_id: {
+        type: "string",
+        description: "Optional ID of the related contact"
+      },
+      task_id: {
+        type: "string",
+        description: "Optional ID of the related task"
+      },
+      project_id: {
+        type: "string",
+        description: "Optional ID of the related project"
+      },
+      type: {
+        type: "string",
+        description: "Type of note",
+        enum: ["general", "contact", "task", "project"]
+      },
+      status: {
+        type: "string",
+        description: "Status of the note",
+        enum: ["active", "archived"]
+      },
+      priority: {
+        type: "string",
+        description: "Priority level of the note",
+        enum: ["low", "medium", "high"]
+      },
+      tags: {
+        type: "array",
+        items: {
+          type: "string"
+        },
+        description: "List of tags to categorize the note"
+      }
+    }
+  },
+  {
+    name: "edit_note",
+    description: "Update an existing note",
+    parameters: {
+      note_id: {
+        type: "string",
+        description: "ID of the note to edit"
+      },
+      title: {
+        type: "string",
+        description: "New title of the note"
+      },
+      content: {
+        type: "string",
+        description: "New content of the note"
+      },
+      contact_id: {
+        type: "string",
+        description: "New ID of the related contact"
+      },
+      task_id: {
+        type: "string",
+        description: "New ID of the related task"
+      },
+      project_id: {
+        type: "string",
+        description: "New ID of the related project"
+      },
+      type: {
+        type: "string",
+        description: "New type of note",
+        enum: ["general", "contact", "task", "project"]
+      },
+      status: {
+        type: "string",
+        description: "New status of the note",
+        enum: ["active", "archived"]
+      },
+      priority: {
+        type: "string",
+        description: "New priority level of the note",
+        enum: ["low", "medium", "high"]
+      },
+      tags: {
+        type: "array",
+        items: {
+          type: "string"
+        },
+        description: "New list of tags to categorize the note"
+      }
+    }
+  },
+  {
+    name: "get_notes",
+    description: "Retrieve notes with optional filtering by various criteria",
+    parameters: {
+      note_id: {
+        type: "string",
+        description: "Optional ID to get a specific note"
+      },
+      search_term: {
+        type: "string",
+        description: "Optional search term to filter notes by title, content, or tags"
+      },
+      type: {
+        type: "string",
+        description: "Optional type to filter notes",
+        enum: ["general", "contact", "task", "project"]
+      },
+      status: {
+        type: "string",
+        description: "Optional status to filter notes",
+        enum: ["active", "archived"]
+      },
+      priority: {
+        type: "string",
+        description: "Optional priority level to filter notes",
+        enum: ["low", "medium", "high"]
+      },
+      contact_id: {
+        type: "string",
+        description: "Optional contact ID to get related notes"
+      },
+      task_id: {
+        type: "string",
+        description: "Optional task ID to get related notes"
+      },
+      project_id: {
+        type: "string",
+        description: "Optional project ID to get related notes"
+      }
+    }
   }
 ];

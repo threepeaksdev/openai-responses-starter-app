@@ -5,8 +5,10 @@ import useConversationStore from "@/stores/useConversationStore";
 import { processMessages } from "@/lib/assistant";
 import { useSupabaseAuth } from "@/lib/hooks/useSupabaseAuth";
 import { useMessages } from "@/lib/hooks/useMessages";
+import { useNotes } from "@/lib/hooks/useNotes";
 import useConversationsStore from "@/stores/useConversationsStore";
 import { useRouter } from "next/navigation";
+import { Item } from "@/lib/assistant";
 
 export default function Assistant() {
   const router = useRouter();
@@ -14,7 +16,13 @@ export default function Assistant() {
   const { currentConversationId, createNewConversation } = useConversationsStore();
   const { chatMessages, addConversationItem, addChatMessage } = useConversationStore();
   const { addMessage, fetchMessages } = useMessages(currentConversationId || '');
+  const { getHighPriorityNotes } = useNotes();
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Filter out system messages for UI display
+  const visibleMessages = chatMessages.filter((item: Item) => 
+    item.type !== "message" || item.role !== "system"
+  );
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -28,10 +36,39 @@ export default function Assistant() {
   }, [authLoading, user, currentConversationId, createNewConversation, router]);
 
   useEffect(() => {
-    if (currentConversationId) {
-      fetchMessages();
-    }
-  }, [currentConversationId, fetchMessages]);
+    const loadConversationData = async () => {
+      if (currentConversationId) {
+        await fetchMessages();
+        
+        // Load high priority notes
+        const highPriorityNotes = await getHighPriorityNotes();
+        if (highPriorityNotes.length > 0) {
+          // Add high priority notes as system message
+          const notesContent = highPriorityNotes.map(note => 
+            `[High Priority Note] ${note.title}\n${note.content}`
+          ).join('\n\n');
+          
+          const systemMessage = {
+            type: "message" as const,
+            role: "system" as const,
+            content: [{
+              type: "input_text" as const,
+              text: `Here are the user's current high priority notes for context:\n\n${notesContent}`
+            }]
+          };
+          
+          // Add to conversation store but don't display in UI
+          addChatMessage(systemMessage);
+          addConversationItem({
+            role: "system",
+            content: systemMessage.content[0].text
+          });
+        }
+      }
+    };
+
+    loadConversationData();
+  }, [currentConversationId, fetchMessages, getHighPriorityNotes, addChatMessage, addConversationItem]);
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim() || !currentConversationId || isProcessing) return;
@@ -83,7 +120,7 @@ export default function Assistant() {
   return (
     <div className="h-full flex flex-col bg-white">
       <Chat 
-        items={chatMessages} 
+        items={visibleMessages} 
         onSendMessage={handleSendMessage}
         isProcessing={isProcessing} 
       />

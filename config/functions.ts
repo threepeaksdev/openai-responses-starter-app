@@ -3,6 +3,7 @@
 // Parameters for a tool call are passed as an object to the corresponding function
 import { handleCreateTask, handleEditTask, handleGetTasks } from "@/app/api/functions/tasks/handler";
 import { handleCreateContact, handleUpdateContact, handleGetContacts } from "@/app/api/functions/contacts/handler";
+import { handleCreateNote, handleUpdateNote, handleGetNotes } from "@/app/api/functions/notes/handler";
 
 export const get_weather = async ({
   location,
@@ -37,6 +38,10 @@ export const edit_contact = handleUpdateContact;
 export const get_contacts = handleGetContacts;
 export const get_tasks = handleGetTasks;
 
+export const create_note = handleCreateNote;
+export const edit_note = handleUpdateNote;
+export const get_notes = handleGetNotes;
+
 export const functionsMap = {
   get_weather,
   get_joke,
@@ -46,4 +51,7 @@ export const functionsMap = {
   edit_contact,
   get_contacts,
   get_tasks,
+  create_note,
+  edit_note,
+  get_notes,
 };

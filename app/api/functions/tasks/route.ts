@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server'
-import type { Database } from '@/types/supabase'
-import { createClient } from '@/lib/supabase/server'
-
-type Task = Database['public']['Tables']['tasks']['Row']
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { handleCreateTask, handleUpdateTask } from './handler'
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    
     const { searchParams } = new URL(request.url)
     const taskId = searchParams.get('id')
-    const status = searchParams.get('status')
+    
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -28,9 +26,24 @@ export async function GET(request: Request) {
       query = query.eq('id', taskId)
     }
 
-    // If status is provided, filter by status
+    // Apply search if provided
+    const search_term = searchParams.get('search_term')
+    if (search_term) {
+      query = query.or(
+        `title.ilike.%${search_term}%,description.ilike.%${search_term}%`
+      )
+    }
+
+    // Apply status filter
+    const status = searchParams.get('status')
     if (status) {
       query = query.eq('status', status)
+    }
+
+    // Apply priority filter
+    const priority = searchParams.get('priority')
+    if (priority) {
+      query = query.eq('priority', priority)
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })
@@ -49,7 +62,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -58,20 +71,20 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const task: Partial<Task> = {
+    
+    // Add user_id to the task data
+    const taskData = {
       ...body,
-      user_id: session.user.id,
+      user_id: session.user.id
     }
 
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert([task])
-      .select()
-      .single()
+    const result = await handleCreateTask(taskData)
 
-    if (error) throw error
+    if (!result.success) {
+      throw new Error(result.error)
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(result.task)
   } catch (error) {
     console.error('Error in POST /api/functions/tasks:', error)
     return NextResponse.json(
@@ -83,14 +96,6 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient()
-    
-    // Get user from session
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
     const taskId = searchParams.get('id')
     
@@ -99,17 +104,16 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json()
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(body)
-      .eq('id', taskId)
-      .eq('user_id', session.user.id)
-      .select()
-      .single()
+    const result = await handleUpdateTask({
+      task_id: taskId,
+      ...body
+    })
 
-    if (error) throw error
+    if (!result.success) {
+      throw new Error(result.error)
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(result.task)
   } catch (error) {
     console.error('Error in PUT /api/functions/tasks:', error)
     return NextResponse.json(
@@ -121,7 +125,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient()
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()

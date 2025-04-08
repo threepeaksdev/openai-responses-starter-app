@@ -1,19 +1,26 @@
-import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
-export interface Note {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  title: string;
-  content: string;
-  contact_id?: string;
-  task_id?: string;
-  project_id?: string;
-  type: 'general' | 'contact' | 'task' | 'project';
-  status: 'active' | 'archived';
-  priority?: 'low' | 'medium' | 'high';
-  tags?: string[];
+interface Note {
+  id?: string
+  title: string
+  content: string
+  contact_id?: string
+  task_id?: string
+  project_id?: string
+  type: 'general' | 'contact' | 'task' | 'project'
+  status: 'active' | 'archived'
+  priority?: 'low' | 'medium' | 'high'
+  tags?: string[]
+  user_id: string
+  created_at?: string
+  updated_at?: string
+}
+
+interface NoteResult {
+  success: boolean
+  note?: Note
+  error?: string
 }
 
 export interface GetNotesParams {
@@ -32,7 +39,7 @@ export interface GetNotesParams {
 }
 
 export async function handleGetNotes(params: GetNotesParams = {}) {
-  const supabase = await createClient();
+  const supabase = createRouteHandlerClient({ cookies })
   const {
     search_term,
     type,
@@ -46,61 +53,61 @@ export async function handleGetNotes(params: GetNotesParams = {}) {
     sort_order = 'desc',
     page = 1,
     per_page = 10
-  } = params;
+  } = params
 
   let query = supabase
     .from('notes')
-    .select('*');
+    .select('*')
 
   // Apply search if provided
   if (search_term) {
     query = query.or(
       `title.ilike.%${search_term}%,content.ilike.%${search_term}%`
-    );
+    )
   }
 
   // Apply type filter
   if (type) {
-    query = query.eq('type', type);
+    query = query.eq('type', type)
   }
 
   // Apply status filter
   if (status) {
-    query = query.eq('status', status);
+    query = query.eq('status', status)
   }
 
   // Apply priority filter
   if (priority) {
-    query = query.eq('priority', priority);
+    query = query.eq('priority', priority)
   }
 
   // Apply relationship filters
   if (contact_id) {
-    query = query.eq('contact_id', contact_id);
+    query = query.eq('contact_id', contact_id)
   }
   if (task_id) {
-    query = query.eq('task_id', task_id);
+    query = query.eq('task_id', task_id)
   }
   if (project_id) {
-    query = query.eq('project_id', project_id);
+    query = query.eq('project_id', project_id)
   }
 
   // Apply tags filter if provided
   if (tags && tags.length > 0) {
-    query = query.contains('tags', tags);
+    query = query.contains('tags', tags)
   }
 
   // Apply sorting
-  query = query.order(sort_by, { ascending: sort_order === 'asc' });
+  query = query.order(sort_by, { ascending: sort_order === 'asc' })
 
   // Apply pagination
-  const start = (page - 1) * per_page;
-  query = query.range(start, start + per_page - 1);
+  const start = (page - 1) * per_page
+  query = query.range(start, start + per_page - 1)
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await query
 
   if (error) {
-    throw error;
+    throw error
   }
 
   return {
@@ -108,69 +115,118 @@ export async function handleGetNotes(params: GetNotesParams = {}) {
     total: count || 0,
     page,
     per_page
-  };
+  }
 }
 
-export async function handleCreateNote(note: Omit<Note, 'id' | 'created_at' | 'updated_at'>) {
-  const supabase = await createClient();
-  
-  const { data, error } = await supabase
-    .from('notes')
-    .insert(note)
-    .select()
-    .single();
+export async function handleCreateNote(noteData: Note): Promise<NoteResult> {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    
+    // Insert the note
+    const { data, error } = await supabase
+      .from('notes')
+      .insert([noteData])
+      .select()
+      .single()
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error
+    }
+
+    return {
+      success: true,
+      note: data
+    }
+  } catch (error) {
+    console.error('Error in handleCreateNote:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
-
-  return data as Note;
 }
 
-export async function handleUpdateNote(id: string, updates: Partial<Note>) {
-  const supabase = await createClient();
-  
-  const { data, error } = await supabase
-    .from('notes')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+export async function handleUpdateNote({
+  note_id,
+  ...updates
+}: {
+  note_id: string
+} & Partial<Note>): Promise<NoteResult> {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    
+    // Get user from session to ensure ownership
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    if (authError || !session) {
+      return {
+        success: false,
+        error: 'Unauthorized'
+      }
+    }
 
-  if (error) {
-    throw error;
+    // Update the note
+    const { data, error } = await supabase
+      .from('notes')
+      .update(updates)
+      .eq('id', note_id)
+      .eq('user_id', session.user.id)
+      .select()
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return {
+      success: true,
+      note: data
+    }
+  } catch (error) {
+    console.error('Error in handleUpdateNote:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
-
-  return data as Note;
 }
 
-export async function handleDeleteNote(id: string) {
-  const supabase = await createClient();
-  
-  const { error } = await supabase
-    .from('notes')
-    .delete()
-    .eq('id', id);
+export async function handleDeleteNote(id: string): Promise<boolean> {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', id)
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in handleDeleteNote:', error)
+    throw error
   }
-
-  return true;
 }
 
-export async function handleGetNote(id: string) {
-  const supabase = await createClient();
-  
-  const { data, error } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('id', id)
-    .single();
+export async function handleGetNote(id: string): Promise<Note> {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in handleGetNote:', error)
+    throw error
   }
-
-  return data as Note;
 } 

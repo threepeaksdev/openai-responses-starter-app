@@ -1,16 +1,23 @@
-import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
-export interface Task {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  title: string;
-  description?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  due_date?: string;
-  priority: 'low' | 'medium' | 'high';
-  tags?: string[];
+interface Task {
+  id?: string
+  title: string
+  description?: string
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  due_date?: string
+  priority: 'low' | 'medium' | 'high'
+  tags?: string[]
+  user_id: string
+  created_at?: string
+  updated_at?: string
+}
+
+interface TaskResult {
+  success: boolean
+  task?: Task
+  error?: string
 }
 
 export interface GetTasksParams {
@@ -25,7 +32,7 @@ export interface GetTasksParams {
 }
 
 export async function handleGetTasks(params: GetTasksParams = {}) {
-  const supabase = createClient(cookies());
+  const supabase = createRouteHandlerClient({ cookies })
   const {
     search_term,
     status,
@@ -35,45 +42,45 @@ export async function handleGetTasks(params: GetTasksParams = {}) {
     sort_order = 'asc',
     page = 1,
     per_page = 10
-  } = params;
+  } = params
 
   let query = supabase
     .from('tasks')
-    .select('*');
+    .select('*')
 
   // Apply search if provided
   if (search_term) {
     query = query.or(
       `title.ilike.%${search_term}%,description.ilike.%${search_term}%`
-    );
+    )
   }
 
   // Apply status filter
   if (status) {
-    query = query.eq('status', status);
+    query = query.eq('status', status)
   }
 
   // Apply priority filter
   if (priority) {
-    query = query.eq('priority', priority);
+    query = query.eq('priority', priority)
   }
 
   // Apply tags filter if provided
   if (tags && tags.length > 0) {
-    query = query.contains('tags', tags);
+    query = query.contains('tags', tags)
   }
 
   // Apply sorting
-  query = query.order(sort_by, { ascending: sort_order === 'asc' });
+  query = query.order(sort_by, { ascending: sort_order === 'asc' })
 
   // Apply pagination
-  const start = (page - 1) * per_page;
-  query = query.range(start, start + per_page - 1);
+  const start = (page - 1) * per_page
+  query = query.range(start, start + per_page - 1)
 
-  const { data, error, count } = await query;
+  const { data, error, count } = await query
 
   if (error) {
-    throw error;
+    throw error
   }
 
   return {
@@ -81,69 +88,108 @@ export async function handleGetTasks(params: GetTasksParams = {}) {
     total: count || 0,
     page,
     per_page
-  };
+  }
 }
 
-export async function handleCreateTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) {
-  const supabase = createClient(cookies());
-  
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert(task)
-    .select()
-    .single();
+export async function handleCreateTask(taskData: Task): Promise<TaskResult> {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    
+    // Insert the task
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert([taskData])
+      .select()
+      .single()
 
-  if (error) {
-    throw error;
+    if (error) {
+      throw error
+    }
+
+    return {
+      success: true,
+      task: data
+    }
+  } catch (error) {
+    console.error('Error in handleCreateTask:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
-
-  return data as Task;
 }
 
-export async function handleUpdateTask(id: string, updates: Partial<Task>) {
-  const supabase = createClient(cookies());
-  
-  const { data, error } = await supabase
-    .from('tasks')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
+export async function handleUpdateTask({
+  task_id,
+  ...updates
+}: {
+  task_id: string
+} & Partial<Task>): Promise<TaskResult> {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    
+    // Get user from session to ensure ownership
+    const { data: { session }, error: authError } = await supabase.auth.getSession()
+    if (authError || !session) {
+      return {
+        success: false,
+        error: 'Unauthorized'
+      }
+    }
 
-  if (error) {
-    throw error;
+    // Update the task
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', task_id)
+      .eq('user_id', session.user.id)
+      .select()
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return {
+      success: true,
+      task: data
+    }
+  } catch (error) {
+    console.error('Error in handleUpdateTask:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
-
-  return data as Task;
 }
 
 export async function handleDeleteTask(id: string) {
-  const supabase = createClient(cookies());
+  const supabase = createRouteHandlerClient({ cookies })
   
   const { error } = await supabase
     .from('tasks')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
 
   if (error) {
-    throw error;
+    throw error
   }
 
-  return true;
+  return true
 }
 
 export async function handleGetTask(id: string) {
-  const supabase = createClient(cookies());
+  const supabase = createRouteHandlerClient({ cookies })
   
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
     .eq('id', id)
-    .single();
+    .single()
 
   if (error) {
-    throw error;
+    throw error
   }
 
-  return data as Task;
+  return data as Task
 } 

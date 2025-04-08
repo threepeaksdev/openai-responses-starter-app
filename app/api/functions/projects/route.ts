@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server'
-import type { Database } from '@/types/supabase'
-import { createClient } from '@/lib/supabase/server'
-
-type Project = Database['public']['Tables']['projects']['Row']
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { handleCreateProject, handleUpdateProject, handleDeleteProject } from './handler'
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('id')
-    const status = searchParams.get('status')
-    const category = searchParams.get('category')
+    
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -29,14 +26,24 @@ export async function GET(request: Request) {
       query = query.eq('id', projectId)
     }
 
-    // If status is provided, filter by status
+    // Apply search if provided
+    const search_term = searchParams.get('search_term')
+    if (search_term) {
+      query = query.or(
+        `title.ilike.%${search_term}%,description.ilike.%${search_term}%`
+      )
+    }
+
+    // Apply status filter
+    const status = searchParams.get('status')
     if (status) {
       query = query.eq('status', status)
     }
 
-    // If category is provided, filter by category
-    if (category) {
-      query = query.eq('category', category)
+    // Apply priority filter
+    const priority = searchParams.get('priority')
+    if (priority) {
+      query = query.eq('priority', priority)
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })
@@ -55,7 +62,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -64,20 +71,20 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const project: Partial<Project> = {
+    
+    // Add user_id to the project data
+    const projectData = {
       ...body,
-      user_id: session.user.id,
+      user_id: session.user.id
     }
 
-    const { data, error } = await supabase
-      .from('projects')
-      .insert([project])
-      .select()
-      .single()
+    const result = await handleCreateProject(projectData)
 
-    if (error) throw error
+    if (!result.success) {
+      throw new Error(result.error)
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(result.project)
   } catch (error) {
     console.error('Error in POST /api/functions/projects:', error)
     return NextResponse.json(
@@ -89,14 +96,6 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient()
-    
-    // Get user from session
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('id')
     
@@ -105,17 +104,16 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json()
-    const { data, error } = await supabase
-      .from('projects')
-      .update(body)
-      .eq('id', projectId)
-      .eq('user_id', session.user.id)
-      .select()
-      .single()
+    const result = await handleUpdateProject({
+      project_id: projectId,
+      ...body
+    })
 
-    if (error) throw error
+    if (!result.success) {
+      throw new Error(result.error)
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(result.project)
   } catch (error) {
     console.error('Error in PUT /api/functions/projects:', error)
     return NextResponse.json(
@@ -127,7 +125,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient()
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -142,13 +140,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
-    const { error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', projectId)
-      .eq('user_id', session.user.id)
+    const success = await handleDeleteProject(projectId)
 
-    if (error) throw error
+    if (!success) {
+      throw new Error('Failed to delete project')
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

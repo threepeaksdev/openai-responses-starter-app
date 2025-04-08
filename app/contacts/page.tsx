@@ -7,7 +7,7 @@ import { useDataFetch } from "@/lib/hooks/use-data-fetch";
 
 export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'created_at' | 'updated_at'>('updated_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);

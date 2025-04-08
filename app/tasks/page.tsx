@@ -12,7 +12,7 @@ export default function TasksPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<Task['status']>();
   const [selectedPriority, setSelectedPriority] = useState<Task['priority']>();
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'updated_at' | 'due_date' | 'priority'>('due_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);

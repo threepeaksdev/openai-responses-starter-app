@@ -12,8 +12,8 @@ export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<Project['status']>();
   const [selectedPriority, setSelectedPriority] = useState<Project['priority']>();
-  const [selectedCategory, setSelectedCategory] = useState<string>();
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedCategory] = useState<string>('')
+  const [selectedTags] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'updated_at' | 'end_date' | 'priority'>('end_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);

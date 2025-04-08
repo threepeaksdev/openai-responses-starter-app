@@ -17,9 +17,9 @@ export default function NotesPage() {
   const [selectedType, setSelectedType] = useState<Note['type']>();
   const [selectedStatus, setSelectedStatus] = useState<Note['status']>();
   const [selectedPriority, setSelectedPriority] = useState<Note['priority']>();
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'updated_at' | 'priority'>('updated_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const { data: notes, loading, error } = useDataFetch<Note>({

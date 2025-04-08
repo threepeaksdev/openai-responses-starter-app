@@ -2,15 +2,16 @@ import { NextResponse } from 'next/server'
 import type { Database } from '@/types/supabase'
 import { createClient } from '@/lib/supabase/server'
 
-type Task = Database['public']['Tables']['tasks']['Row']
+type Project = Database['public']['Tables']['projects']['Row']
 
 export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     
     const { searchParams } = new URL(request.url)
-    const taskId = searchParams.get('id')
+    const projectId = searchParams.get('id')
     const status = searchParams.get('status')
+    const category = searchParams.get('category')
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -19,18 +20,23 @@ export async function GET(request: Request) {
     }
 
     let query = supabase
-      .from('tasks')
+      .from('projects')
       .select('*')
       .eq('user_id', session.user.id)
 
-    // If taskId is provided, get specific task
-    if (taskId) {
-      query = query.eq('id', taskId)
+    // If projectId is provided, get specific project
+    if (projectId) {
+      query = query.eq('id', projectId)
     }
 
     // If status is provided, filter by status
     if (status) {
       query = query.eq('status', status)
+    }
+
+    // If category is provided, filter by category
+    if (category) {
+      query = query.eq('category', category)
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })
@@ -39,7 +45,7 @@ export async function GET(request: Request) {
     
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in GET /api/functions/tasks:', error)
+    console.error('Error in GET /api/functions/projects:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -58,14 +64,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const task: Partial<Task> = {
+    const project: Partial<Project> = {
       ...body,
       user_id: session.user.id,
     }
 
     const { data, error } = await supabase
-      .from('tasks')
-      .insert([task])
+      .from('projects')
+      .insert([project])
       .select()
       .single()
 
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in POST /api/functions/tasks:', error)
+    console.error('Error in POST /api/functions/projects:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -92,17 +98,17 @@ export async function PUT(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const taskId = searchParams.get('id')
+    const projectId = searchParams.get('id')
     
-    if (!taskId) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+    if (!projectId) {
+      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
     const body = await request.json()
     const { data, error } = await supabase
-      .from('tasks')
+      .from('projects')
       .update(body)
-      .eq('id', taskId)
+      .eq('id', projectId)
       .eq('user_id', session.user.id)
       .select()
       .single()
@@ -111,7 +117,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in PUT /api/functions/tasks:', error)
+    console.error('Error in PUT /api/functions/projects:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -130,23 +136,23 @@ export async function DELETE(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const taskId = searchParams.get('id')
+    const projectId = searchParams.get('id')
     
-    if (!taskId) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+    if (!projectId) {
+      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
     const { error } = await supabase
-      .from('tasks')
+      .from('projects')
       .delete()
-      .eq('id', taskId)
+      .eq('id', projectId)
       .eq('user_id', session.user.id)
 
     if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/functions/tasks:', error)
+    console.error('Error in DELETE /api/functions/projects:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

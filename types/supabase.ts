@@ -55,7 +55,15 @@ export type Contact = {
   metadata?: Record<string, any>
 }
 
-export type Database = {
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export interface Database {
   public: {
     Tables: {
       messages: {
@@ -69,15 +77,163 @@ export type Database = {
         Update: Partial<Omit<Profile, 'id' | 'created_at'>>
       }
       tasks: {
-        Row: Task
-        Insert: Omit<Task, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Task, 'id' | 'created_at' | 'updated_at'>>
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          title: string
+          description: string | null
+          status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+          due_date: string | null
+          priority: 'low' | 'medium' | 'high'
+          tags: string[] | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title: string
+          description?: string | null
+          status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+          due_date?: string | null
+          priority?: 'low' | 'medium' | 'high'
+          tags?: string[] | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title?: string
+          description?: string | null
+          status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+          due_date?: string | null
+          priority?: 'low' | 'medium' | 'high'
+          tags?: string[] | null
+        }
       }
       contacts: {
-        Row: Contact
-        Insert: Omit<Contact, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Contact, 'id' | 'created_at' | 'updated_at'>>
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          first_name: string
+          last_name: string
+          email: string | null
+          phone: string | null
+          company: string | null
+          location: string | null
+          tags: string[] | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          first_name: string
+          last_name: string
+          email?: string | null
+          phone?: string | null
+          company?: string | null
+          location?: string | null
+          tags?: string[] | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          first_name?: string
+          last_name?: string
+          email?: string | null
+          phone?: string | null
+          company?: string | null
+          location?: string | null
+          tags?: string[] | null
+        }
       }
+      notes: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          title: string
+          content: string | null
+          type: 'general' | 'contact' | 'task' | 'project'
+          status: 'active' | 'archived'
+          priority: 'low' | 'medium' | 'high'
+          tags: string[] | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title: string
+          content?: string | null
+          type?: 'general' | 'contact' | 'task' | 'project'
+          status?: 'active' | 'archived'
+          priority?: 'low' | 'medium' | 'high'
+          tags?: string[] | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title?: string
+          content?: string | null
+          type?: 'general' | 'contact' | 'task' | 'project'
+          status?: 'active' | 'archived'
+          priority?: 'low' | 'medium' | 'high'
+          tags?: string[] | null
+        }
+      }
+      projects: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          title: string
+          description: string | null
+          status: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
+          start_date: string | null
+          end_date: string | null
+          priority: 'low' | 'medium' | 'high'
+          category: string | null
+          tags: string[] | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title: string
+          description?: string | null
+          status?: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
+          start_date?: string | null
+          end_date?: string | null
+          priority?: 'low' | 'medium' | 'high'
+          category?: string | null
+          tags?: string[] | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          title?: string
+          description?: string | null
+          status?: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled'
+          start_date?: string | null
+          end_date?: string | null
+          priority?: 'low' | 'medium' | 'high'
+          category?: string | null
+          tags?: string[] | null
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 } 

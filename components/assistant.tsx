@@ -118,7 +118,7 @@ export default function Assistant() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col overflow-hidden">
       <Chat 
         items={visibleMessages} 
         onSendMessage={handleSendMessage}

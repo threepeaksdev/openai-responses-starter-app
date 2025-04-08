@@ -1,254 +1,149 @@
-import { Task } from '@/types/supabase'
-import { supabase } from "@/lib/supabase";
+import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 
-interface ManageTasksParams {
-  action: 'create' | 'read' | 'update' | 'delete'
-  taskId?: string
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
-  task?: Partial<Task>
-}
-
-interface CreateTaskParams {
+export interface Task {
+  id: string;
+  created_at: string;
+  updated_at: string;
   title: string;
   description?: string;
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   due_date?: string;
-  priority?: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high';
   tags?: string[];
 }
 
-interface EditTaskParams {
-  task_id: string;
-  title?: string;
-  description?: string;
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export interface GetTasksParams {
+  search_term?: string;
+  status?: Task['status'];
+  priority?: Task['priority'];
+  tags?: string[];
+  sort_by?: 'title' | 'created_at' | 'updated_at' | 'due_date' | 'priority';
+  sort_order?: 'asc' | 'desc';
+  page?: number;
+  per_page?: number;
 }
 
-interface GetTasksParams {
-  task_id?: string
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+export async function handleGetTasks(params: GetTasksParams = {}) {
+  const supabase = createClient(cookies());
+  const {
+    search_term,
+    status,
+    priority,
+    tags,
+    sort_by = 'due_date',
+    sort_order = 'asc',
+    page = 1,
+    per_page = 10
+  } = params;
+
+  let query = supabase
+    .from('tasks')
+    .select('*');
+
+  // Apply search if provided
+  if (search_term) {
+    query = query.or(
+      `title.ilike.%${search_term}%,description.ilike.%${search_term}%`
+    );
+  }
+
+  // Apply status filter
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  // Apply priority filter
+  if (priority) {
+    query = query.eq('priority', priority);
+  }
+
+  // Apply tags filter if provided
+  if (tags && tags.length > 0) {
+    query = query.contains('tags', tags);
+  }
+
+  // Apply sorting
+  query = query.order(sort_by, { ascending: sort_order === 'asc' });
+
+  // Apply pagination
+  const start = (page - 1) * per_page;
+  query = query.range(start, start + per_page - 1);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    tasks: data as Task[],
+    total: count || 0,
+    page,
+    per_page
+  };
 }
 
-export async function handleManageTasks(params: ManageTasksParams) {
-  const { action, taskId, status, task } = params
-  const baseUrl = '/api/functions/tasks'
+export async function handleCreateTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) {
+  const supabase = createClient(cookies());
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert(task)
+    .select()
+    .single();
 
-  try {
-    switch (action) {
-      case 'create': {
-        if (!task) {
-          throw new Error('Task data is required for create action')
-        }
-
-        const response = await fetch(baseUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(task),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to create task: ${response.statusText}`)
-        }
-
-        return await response.json()
-      }
-
-      case 'read': {
-        const url = new URL(baseUrl, window.location.origin)
-        if (taskId) url.searchParams.set('id', taskId)
-        if (status) url.searchParams.set('status', status)
-
-        const response = await fetch(url.toString())
-        if (!response.ok) {
-          throw new Error(`Failed to read tasks: ${response.statusText}`)
-        }
-
-        return await response.json()
-      }
-
-      case 'update': {
-        if (!taskId) {
-          throw new Error('Task ID is required for update action')
-        }
-        if (!task) {
-          throw new Error('Task data is required for update action')
-        }
-
-        const url = new URL(baseUrl, window.location.origin)
-        url.searchParams.set('id', taskId)
-
-        const response = await fetch(url.toString(), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(task),
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to update task: ${response.statusText}`)
-        }
-
-        return await response.json()
-      }
-
-      case 'delete': {
-        if (!taskId) {
-          throw new Error('Task ID is required for delete action')
-        }
-
-        const url = new URL(baseUrl, window.location.origin)
-        url.searchParams.set('id', taskId)
-
-        const response = await fetch(url.toString(), {
-          method: 'DELETE',
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete task: ${response.statusText}`)
-        }
-
-        return await response.json()
-      }
-
-      default:
-        throw new Error(`Invalid action: ${action}`)
-    }
-  } catch (error) {
-    console.error('Error in handleManageTasks:', error)
-    throw error
+  if (error) {
+    throw error;
   }
+
+  return data as Task;
 }
 
-export const handleCreateTask = async (params: CreateTaskParams) => {
-  try {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
-      throw new Error('User not authenticated');
-    }
+export async function handleUpdateTask(id: string, updates: Partial<Task>) {
+  const supabase = createClient(cookies());
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
 
-    const newTask = {
-      user_id: userData.user.id,
-      title: params.title,
-      description: params.description,
-      status: params.status || 'pending',
-      due_date: params.due_date,
-      priority: params.priority || 'medium',
-      tags: params.tags || []
-    };
-
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert([newTask])
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return {
-      success: true,
-      task: data
-    };
-  } catch (error) {
-    console.error('Error creating task:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
+  if (error) {
+    throw error;
   }
-};
 
-export const handleEditTask = async (params: EditTaskParams) => {
-  try {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
-      throw new Error('User not authenticated');
-    }
+  return data as Task;
+}
 
-    // First check if the task exists and belongs to the user
-    const { data: existingTask, error: fetchError } = await supabase
-      .from('tasks')
-      .select()
-      .eq('id', params.task_id)
-      .eq('user_id', userData.user.id)
-      .single();
+export async function handleDeleteTask(id: string) {
+  const supabase = createClient(cookies());
+  
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id);
 
-    if (fetchError || !existingTask) {
-      throw new Error('Task not found or access denied');
-    }
-
-    // Prepare update data (only include fields that are provided)
-    const updateData: Partial<Task> = {};
-    if (params.title !== undefined) updateData.title = params.title;
-    if (params.description !== undefined) updateData.description = params.description;
-    if (params.status !== undefined) updateData.status = params.status;
-
-    // Update the task
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(updateData)
-      .eq('id', params.task_id)
-      .eq('user_id', userData.user.id) // Extra safety check
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return {
-      success: true,
-      task: data
-    };
-  } catch (error) {
-    console.error('Error editing task:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    };
+  if (error) {
+    throw error;
   }
-};
 
-export const handleGetTasks = async (params: GetTasksParams) => {
-  try {
-    // Get the authenticated user
-    const { data: userData, error: authError } = await supabase.auth.getUser()
-    if (authError || !userData.user) {
-      throw new Error('User not authenticated')
-    }
+  return true;
+}
 
-    // Start building the query
-    let query = supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userData.user.id)
+export async function handleGetTask(id: string) {
+  const supabase = createClient(cookies());
+  
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-    // Add filters based on provided parameters
-    if (params.task_id) {
-      query = query.eq('id', params.task_id)
-    }
-
-    if (params.status) {
-      query = query.eq('status', params.status)
-    }
-
-    // Execute the query
-    const { data, error } = await query.order('created_at', { ascending: false })
-
-    if (error) {
-      throw error
-    }
-
-    return {
-      success: true,
-      tasks: data,
-      count: data.length
-    }
-  } catch (error) {
-    console.error('Error retrieving tasks:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    }
+  if (error) {
+    throw error;
   }
+
+  return data as Task;
 } 

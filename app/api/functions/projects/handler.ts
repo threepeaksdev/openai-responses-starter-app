@@ -1,67 +1,58 @@
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
-export interface Note {
+export interface Project {
   id: string;
   created_at: string;
   updated_at: string;
   title: string;
-  content: string;
-  contact_id?: string;
-  task_id?: string;
-  project_id?: string;
-  type: 'general' | 'contact' | 'task' | 'project';
-  status: 'active' | 'archived';
+  description?: string;
+  status: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  start_date?: string;
+  due_date?: string;
+  completed_date?: string;
   priority?: 'low' | 'medium' | 'high';
+  category?: string;
+  team_members?: string[];
+  contact_ids?: string[];
   tags?: string[];
 }
 
-export interface GetNotesParams {
+export interface GetProjectsParams {
   search_term?: string;
-  type?: Note['type'];
-  status?: Note['status'];
-  priority?: Note['priority'];
-  contact_id?: string;
-  task_id?: string;
-  project_id?: string;
+  status?: Project['status'];
+  priority?: Project['priority'];
+  category?: string;
   tags?: string[];
-  sort_by?: 'title' | 'created_at' | 'updated_at' | 'priority';
+  sort_by?: 'title' | 'created_at' | 'updated_at' | 'start_date' | 'due_date' | 'priority';
   sort_order?: 'asc' | 'desc';
   page?: number;
   per_page?: number;
 }
 
-export async function handleGetNotes(params: GetNotesParams = {}) {
-  const supabase = await createClient();
+export async function handleGetProjects(params: GetProjectsParams = {}) {
+  const supabase = createClient(cookies());
   const {
     search_term,
-    type,
-    status = 'active',
+    status,
     priority,
-    contact_id,
-    task_id,
-    project_id,
+    category,
     tags,
-    sort_by = 'updated_at',
-    sort_order = 'desc',
+    sort_by = 'due_date',
+    sort_order = 'asc',
     page = 1,
     per_page = 10
   } = params;
 
   let query = supabase
-    .from('notes')
+    .from('projects')
     .select('*');
 
   // Apply search if provided
   if (search_term) {
     query = query.or(
-      `title.ilike.%${search_term}%,content.ilike.%${search_term}%`
+      `title.ilike.%${search_term}%,description.ilike.%${search_term}%`
     );
-  }
-
-  // Apply type filter
-  if (type) {
-    query = query.eq('type', type);
   }
 
   // Apply status filter
@@ -74,15 +65,9 @@ export async function handleGetNotes(params: GetNotesParams = {}) {
     query = query.eq('priority', priority);
   }
 
-  // Apply relationship filters
-  if (contact_id) {
-    query = query.eq('contact_id', contact_id);
-  }
-  if (task_id) {
-    query = query.eq('task_id', task_id);
-  }
-  if (project_id) {
-    query = query.eq('project_id', project_id);
+  // Apply category filter
+  if (category) {
+    query = query.eq('category', category);
   }
 
   // Apply tags filter if provided
@@ -104,19 +89,19 @@ export async function handleGetNotes(params: GetNotesParams = {}) {
   }
 
   return {
-    notes: data as Note[],
+    projects: data as Project[],
     total: count || 0,
     page,
     per_page
   };
 }
 
-export async function handleCreateNote(note: Omit<Note, 'id' | 'created_at' | 'updated_at'>) {
-  const supabase = await createClient();
+export async function handleCreateProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) {
+  const supabase = createClient(cookies());
   
   const { data, error } = await supabase
-    .from('notes')
-    .insert(note)
+    .from('projects')
+    .insert(project)
     .select()
     .single();
 
@@ -124,14 +109,14 @@ export async function handleCreateNote(note: Omit<Note, 'id' | 'created_at' | 'u
     throw error;
   }
 
-  return data as Note;
+  return data as Project;
 }
 
-export async function handleUpdateNote(id: string, updates: Partial<Note>) {
-  const supabase = await createClient();
+export async function handleUpdateProject(id: string, updates: Partial<Project>) {
+  const supabase = createClient(cookies());
   
   const { data, error } = await supabase
-    .from('notes')
+    .from('projects')
     .update(updates)
     .eq('id', id)
     .select()
@@ -141,14 +126,14 @@ export async function handleUpdateNote(id: string, updates: Partial<Note>) {
     throw error;
   }
 
-  return data as Note;
+  return data as Project;
 }
 
-export async function handleDeleteNote(id: string) {
-  const supabase = await createClient();
+export async function handleDeleteProject(id: string) {
+  const supabase = createClient(cookies());
   
   const { error } = await supabase
-    .from('notes')
+    .from('projects')
     .delete()
     .eq('id', id);
 
@@ -159,11 +144,11 @@ export async function handleDeleteNote(id: string) {
   return true;
 }
 
-export async function handleGetNote(id: string) {
-  const supabase = await createClient();
+export async function handleGetProject(id: string) {
+  const supabase = createClient(cookies());
   
   const { data, error } = await supabase
-    .from('notes')
+    .from('projects')
     .select('*')
     .eq('id', id)
     .single();
@@ -172,5 +157,5 @@ export async function handleGetNote(id: string) {
     throw error;
   }
 
-  return data as Note;
+  return data as Project;
 } 

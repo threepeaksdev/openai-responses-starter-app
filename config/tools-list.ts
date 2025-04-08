@@ -411,5 +411,111 @@ export const toolsList = [
         description: "Optional project ID to get related notes"
       }
     }
+  },
+  {
+    name: "create_project",
+    description: "Create a new project",
+    parameters: {
+      title: {
+        type: "string",
+        description: "Title of the project"
+      },
+      description: {
+        type: "string",
+        description: "Description of the project"
+      },
+      status: {
+        type: "string",
+        description: "Status of the project",
+        enum: ["planning", "in_progress", "completed", "on_hold", "cancelled"]
+      },
+      priority: {
+        type: "string",
+        description: "Priority level of the project",
+        enum: ["low", "medium", "high"]
+      },
+      start_date: {
+        type: "string",
+        description: "Start date of the project in YYYY-MM-DD format"
+      },
+      end_date: {
+        type: "string",
+        description: "End date of the project in YYYY-MM-DD format"
+      },
+      tags: {
+        type: "array",
+        items: {
+          type: "string"
+        },
+        description: "List of tags to categorize the project"
+      }
+    }
+  },
+  {
+    name: "edit_project",
+    description: "Update an existing project",
+    parameters: {
+      project_id: {
+        type: "string",
+        description: "ID of the project to edit"
+      },
+      title: {
+        type: "string",
+        description: "New title of the project"
+      },
+      description: {
+        type: "string",
+        description: "New description of the project"
+      },
+      status: {
+        type: "string",
+        description: "New status of the project",
+        enum: ["planning", "in_progress", "completed", "on_hold", "cancelled"]
+      },
+      priority: {
+        type: "string",
+        description: "New priority level of the project",
+        enum: ["low", "medium", "high"]
+      },
+      start_date: {
+        type: "string",
+        description: "New start date of the project in YYYY-MM-DD format"
+      },
+      end_date: {
+        type: "string",
+        description: "New end date of the project in YYYY-MM-DD format"
+      },
+      tags: {
+        type: "array",
+        items: {
+          type: "string"
+        },
+        description: "New list of tags to categorize the project"
+      }
+    }
+  },
+  {
+    name: "get_projects",
+    description: "Retrieve projects from the user's project list. IMPORTANT: Only use filters when explicitly requested in the query. For example, only filter by status when user asks about projects with a specific status, or by priority when they ask about projects with a specific priority level. For a general 'show my projects' query, do not apply any filters.",
+    parameters: {
+      project_id: {
+        type: "string",
+        description: "Optional: ID of a specific project to retrieve. Only use when a specific project is requested."
+      },
+      search_term: {
+        type: "string",
+        description: "Optional: Search term to filter projects by title or description. Only use when searching for specific terms."
+      },
+      status: {
+        type: "string",
+        description: "Optional: Filter projects by status. Only use when status is specifically mentioned in the query.",
+        enum: ["planning", "in_progress", "completed", "on_hold", "cancelled"]
+      },
+      priority: {
+        type: "string",
+        description: "Optional: Filter projects by priority. Only use when priority is specifically mentioned in the query.",
+        enum: ["low", "medium", "high"]
+      }
+    }
   }
 ];

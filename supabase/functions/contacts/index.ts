@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createServer } from 'http'
+import { createClient } from '@supabase/supabase-js'
+import { corsHeaders } from '../_shared/cors'
 
 interface Contact {
   id?: string
@@ -28,30 +28,35 @@ interface Contact {
   updated_at?: string
 }
 
-serve(async (req) => {
+createServer(async (req, res) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    res.writeHead(200, corsHeaders)
+    res.end()
+    return
   }
 
   try {
     // Log request details
     console.log('Request method:', req.method)
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+    console.log('Request headers:', req.headers)
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseUrl = process.env.SUPABASE_URL || 'default_url'
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'default_key'
     
     console.log('Supabase URL:', supabaseUrl)
     console.log('Supabase Anon Key exists:', !!supabaseAnonKey)
 
+    // Get the authorization header
+    const authHeader = req.headers['authorization'] || ''
+
     // Create a Supabase client with the Auth context of the logged in user
     const supabaseClient = createClient(
-      supabaseUrl ?? '',
-      supabaseAnonKey ?? '',
+      supabaseUrl,
+      supabaseAnonKey,
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     )
@@ -75,7 +80,10 @@ serve(async (req) => {
     switch (req.method) {
       case 'GET': {
         // Parse query parameters
-        const url = new URL(req.url)
+        if (!req.url) {
+          throw new Error('URL is required');
+        }
+        const url = new URL(req.url);
         const search_term = url.searchParams.get('search_term') || undefined
         const tags = url.searchParams.get('tags')?.split(',') || undefined
         const sort_by = url.searchParams.get('sort_by') || 'created_at'
@@ -113,22 +121,27 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(
-          JSON.stringify({
-            data,
-            total: count || 0,
-            page,
-            per_page,
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        )
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          data,
+          total: count || 0,
+          page,
+          per_page,
+        }))
+        break
       }
 
       case 'POST': {
-        const body = await req.json()
+        const body = await new Promise<any>((resolve, reject) => {
+          let data = ''
+          req.on('data', chunk => {
+            data += chunk
+          })
+          req.on('end', () => {
+            resolve(JSON.parse(data))
+          })
+          req.on('error', reject)
+        })
         
         console.log('POST body:', body)
 
@@ -149,6 +162,8 @@ serve(async (req) => {
         }, {} as Record<string, any>);
 
         const contactData: Contact = {
+          first_name: body.first_name,
+          last_name: body.last_name,
           ...cleanedBody,
           user_id: user.id,
         };
@@ -166,24 +181,35 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 201,
-        })
+        res.writeHead(201, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(data))
+        break
       }
 
       case 'PUT': {
-        const url = new URL(req.url)
+        if (!req.url) {
+          throw new Error('URL is required');
+        }
+        const url = new URL(req.url);
         const contactId = url.searchParams.get('id')
         
         if (!contactId) {
           throw new Error('Contact ID is required')
         }
 
-        const body = await req.json()
+        const body = await new Promise<any>((resolve, reject) => {
+          let data = ''
+          req.on('data', chunk => {
+            data += chunk
+          })
+          req.on('end', () => {
+            resolve(JSON.parse(data))
+          })
+          req.on('error', reject)
+        })
         console.log('PUT body:', { id: contactId, ...body })
 
-        const { data, error } = await supabaseClient
+        const { data: updatedData, error } = await supabaseClient
           .from('contacts')
           .update(body)
           .eq('id', contactId)
@@ -196,14 +222,16 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(updatedData))
+        break
       }
 
       case 'DELETE': {
-        const url = new URL(req.url)
+        if (!req.url) {
+          throw new Error('URL is required');
+        }
+        const url = new URL(req.url);
         const contactId = url.searchParams.get('id')
         
         if (!contactId) {
@@ -223,10 +251,9 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
+        break
       }
 
       default:
@@ -234,15 +261,11 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error:', error)
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+    res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    }))
   }
-}) 
+}).listen(8080) 

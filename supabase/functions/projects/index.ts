@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from '@supabase/supabase-js'
+import { createServer } from 'http'
+import { corsHeaders } from '../_shared/cors'
 
 interface Project {
   id?: string
@@ -16,19 +16,21 @@ interface Project {
   updated_at?: string
 }
 
-serve(async (req) => {
+// Replace Deno's serve function with Node.js HTTP server
+createServer(async (req, res) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    res.writeHead(200, corsHeaders)
+    return res.end('ok')
   }
 
   try {
     // Log request details
     console.log('Request method:', req.method)
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+    console.log('Request headers:', req.headers)
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
     
     console.log('Supabase URL:', supabaseUrl)
     console.log('Supabase Anon Key exists:', !!supabaseAnonKey)
@@ -39,7 +41,7 @@ serve(async (req) => {
       supabaseAnonKey ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: req.headers['authorization']! },
         },
       }
     )
@@ -72,10 +74,11 @@ serve(async (req) => {
       throw new Error(`Database connection error: ${testError.message}`)
     }
 
+    // Handle different request methods
     switch (req.method) {
       case 'GET': {
         // Parse query parameters
-        const url = new URL(req.url)
+        const url = new URL(req.url!, `http://${req.headers.host}`)
         const search_term = url.searchParams.get('search_term') || undefined
         const status = url.searchParams.get('status') || undefined
         const sort_by = url.searchParams.get('sort_by') || 'created_at'
@@ -120,89 +123,122 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(
-          JSON.stringify({
-            data,
-            total: count || 0,
-            page,
-            per_page,
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        )
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({
+          data,
+          total: count || 0,
+          page,
+          per_page,
+        }))
       }
 
       case 'POST': {
-        const body = await req.json()
-        
-        console.log('POST body:', body)
-
-        // Validate required fields
-        if (!body.title) {
-          throw new Error('Title is required')
-        }
-
-        // Prepare project data with defaults
-        const projectData: Project = {
-          title: body.title,
-          description: body.description || '',
-          status: body.status || 'planning',
-          priority: body.priority || 'medium',
-          start_date: body.start_date || new Date().toISOString().split('T')[0],
-          end_date: body.end_date || null,
-          user_id: user.id
-        }
-
-        // Only add tags if they exist in the request
-        if (body.tags) {
-          projectData.tags = Array.isArray(body.tags) ? body.tags : (body.tags ? [body.tags] : [])
-        }
-
-        console.log('Creating project with data:', projectData)
-
-        // Try to insert the project
-        const { data, error } = await supabaseClient
-          .from('projects')
-          .insert([projectData])
-          .select()
-          .single()
-
-        if (error) {
-          console.error('Database error:', error)
-          throw new Error(`Database error: ${error.message}`)
-        }
-
-        console.log('Project created successfully:', data)
-
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 201,
+        let body = ''
+        req.on('data', chunk => {
+          body += chunk.toString()
         })
+        req.on('end', async () => {
+          const parsedBody = JSON.parse(body)
+          console.log('POST body:', parsedBody)
+
+          // Validate required fields
+          if (!parsedBody.title) {
+            throw new Error('Title is required')
+          }
+
+          // Prepare project data with defaults
+          const projectData: Project = {
+            title: parsedBody.title,
+            description: parsedBody.description || '',
+            status: parsedBody.status || 'planning',
+            priority: parsedBody.priority || 'medium',
+            start_date: parsedBody.start_date || new Date().toISOString().split('T')[0],
+            end_date: parsedBody.end_date || null,
+            user_id: user.id
+          }
+
+          // Only add tags if they exist in the request
+          if (parsedBody.tags) {
+            projectData.tags = Array.isArray(parsedBody.tags) ? parsedBody.tags : (parsedBody.tags ? [parsedBody.tags] : [])
+          }
+
+          console.log('Creating project with data:', projectData)
+
+          // Try to insert the project
+          const { data, error } = await supabaseClient
+            .from('projects')
+            .insert([projectData])
+            .select()
+            .single()
+
+          if (error) {
+            console.error('Database error:', error)
+            throw new Error(`Database error: ${error.message}`)
+          }
+
+          console.log('Project created successfully:', data)
+
+          res.writeHead(201, { ...corsHeaders, 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify(data))
+        })
+        break
       }
 
       case 'PUT': {
-        const url = new URL(req.url)
+        const url = new URL(req.url!, `http://${req.headers.host}`)
         const projectId = url.searchParams.get('id')
         
         if (!projectId) {
           throw new Error('Project ID is required')
         }
 
-        const body = await req.json()
-        console.log('PUT body:', { id: projectId, ...body })
+        let body = ''
+        req.on('data', chunk => {
+          body += chunk.toString()
+        })
+        req.on('end', async () => {
+          const parsedBody = JSON.parse(body)
+          console.log('PUT body:', { id: projectId, ...parsedBody })
 
-        // Ensure status is valid if provided
-        if (body.status && !['planning', 'in_progress', 'completed', 'on_hold', 'cancelled'].includes(body.status)) {
-          throw new Error('Invalid status value')
+          // Ensure status is valid if provided
+          if (parsedBody.status && !['planning', 'in_progress', 'completed', 'on_hold', 'cancelled'].includes(parsedBody.status)) {
+            throw new Error('Invalid status value')
+          }
+
+          // Update the project
+          const { data, error } = await supabaseClient
+            .from('projects')
+            .update(parsedBody)
+            .eq('id', projectId)
+            .select()
+            .single()
+
+          if (error) {
+            console.error('Database error:', error)
+            throw new Error(`Database error: ${error.message}`)
+          }
+
+          console.log('Project updated successfully:', data)
+
+          res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+          return res.end(JSON.stringify(data))
+        })
+        break
+      }
+
+      case 'DELETE': {
+        const url = new URL(req.url!, `http://${req.headers.host}`)
+        const projectId = url.searchParams.get('id')
+        
+        if (!projectId) {
+          throw new Error('Project ID is required')
         }
 
+        // Delete the project
         const { data, error } = await supabaseClient
           .from('projects')
-          .update(body)
+          .delete()
           .eq('id', projectId)
-          .eq('user_id', user.id)
           .select()
           .single()
 
@@ -211,54 +247,26 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        console.log('Project deleted successfully:', data)
+
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify(data))
       }
 
-      case 'DELETE': {
-        const url = new URL(req.url)
-        const projectId = url.searchParams.get('id')
-        
-        if (!projectId) {
-          throw new Error('Project ID is required')
-        }
-
-        console.log('DELETE project:', projectId)
-
-        const { error } = await supabaseClient
-          .from('projects')
-          .delete()
-          .eq('id', projectId)
-          .eq('user_id', user.id)
-
-        if (error) {
-          console.error('Database error:', error)
-          throw new Error(`Database error: ${error.message}`)
-        }
-
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+      default: {
+        res.writeHead(405, { ...corsHeaders, 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ error: 'Method not allowed' }))
       }
-
-      default:
-        throw new Error(`Method ${req.method} not allowed`)
     }
   } catch (error) {
     console.error('Error:', error)
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+    res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' })
+    return res.end(JSON.stringify({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    }))
   }
+}).listen(3000, () => {
+  console.log('Server running on http://localhost:3000')
 }) 

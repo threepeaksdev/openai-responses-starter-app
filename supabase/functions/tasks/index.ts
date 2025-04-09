@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from '@supabase/supabase-js'
+import { corsHeaders } from '../_shared/cors'
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 interface Task {
   id?: string
@@ -15,30 +15,40 @@ interface Task {
   updated_at?: string
 }
 
-serve(async (req) => {
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    res.setHeader('Allow', 'GET, POST, PUT, DELETE, OPTIONS')
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value)
+    })
+    return res.status(200).end()
   }
 
   try {
     // Log request details
     console.log('Request method:', req.method)
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+    console.log('Request headers:', req.headers)
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseUrl = process.env.SUPABASE_URL || 'default_url'
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'default_key'
     
     console.log('Supabase URL:', supabaseUrl)
     console.log('Supabase Anon Key exists:', !!supabaseAnonKey)
 
+    // Get the authorization header
+    const authHeader = req.headers.authorization || ''
+
     // Create a Supabase client with the Auth context of the logged in user
     const supabaseClient = createClient(
-      supabaseUrl ?? '',
-      supabaseAnonKey ?? '',
+      supabaseUrl,
+      supabaseAnonKey,
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     )
@@ -56,7 +66,7 @@ serve(async (req) => {
     }
 
     if (!user) {
-      throw new Error('User not authenticated')
+      return res.status(401).json({ error: 'Unauthorized' })
     }
 
     // Test database connection
@@ -74,15 +84,14 @@ serve(async (req) => {
     switch (req.method) {
       case 'GET': {
         // Parse query parameters
-        const url = new URL(req.url)
-        const search_term = url.searchParams.get('search_term') || undefined
-        const status = url.searchParams.get('status') || undefined
-        const priority = url.searchParams.get('priority') || undefined
-        const tags = url.searchParams.get('tags')?.split(',') || undefined
-        const sort_by = url.searchParams.get('sort_by') || 'created_at'
-        const sort_order = url.searchParams.get('sort_order') || 'desc'
-        const page = parseInt(url.searchParams.get('page') || '1')
-        const per_page = parseInt(url.searchParams.get('per_page') || '10')
+        const search_term = req.query.search_term as string || undefined
+        const status = req.query.status as string || undefined
+        const priority = req.query.priority as string || undefined
+        const tags = req.query.tags ? (req.query.tags as string).split(',') : undefined
+        const sort_by = req.query.sort_by as string || 'created_at'
+        const sort_order = req.query.sort_order as string || 'desc'
+        const page = parseInt(req.query.page as string || '1')
+        const per_page = parseInt(req.query.per_page as string || '10')
 
         console.log('GET params:', { search_term, status, priority, tags, sort_by, sort_order, page, per_page })
 
@@ -122,35 +131,27 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(
-          JSON.stringify({
-            data,
-            total: count || 0,
-            page,
-            per_page,
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        )
+        return res.status(200).json({
+          data,
+          total: count || 0,
+          page,
+          per_page,
+        })
       }
 
       case 'POST': {
-        const body = await req.json()
+        const taskData = { 
+          ...req.body, 
+          user_id: user.id, 
+          status: req.body.status || 'pending', 
+          priority: req.body.priority || 'medium' 
+        }
         
-        console.log('POST body:', body)
+        console.log('POST body:', taskData)
 
         // Validate required fields
-        if (!body.title) {
-          throw new Error('Title is required')
-        }
-
-        const taskData: Task = {
-          ...body,
-          user_id: user.id,
-          status: body.status || 'pending',
-          priority: body.priority || 'medium',
+        if (!taskData.title) {
+          return res.status(400).json({ error: 'Title is required' })
         }
 
         console.log('Creating task:', taskData)
@@ -180,26 +181,22 @@ serve(async (req) => {
 
         console.log('Task created successfully:', data)
 
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 201,
-        })
+        return res.status(201).json(data)
       }
 
       case 'PUT': {
-        const url = new URL(req.url)
-        const taskId = url.searchParams.get('id')
-        
+        const taskId = req.query.id as string
+
         if (!taskId) {
-          throw new Error('Task ID is required')
+          return res.status(400).json({ error: 'Task ID is required' })
         }
 
-        const body = await req.json()
-        console.log('PUT body:', { id: taskId, ...body })
+        console.log('PUT body:', req.body)
 
+        // Try to update the task
         const { data, error } = await supabaseClient
           .from('tasks')
-          .update(body)
+          .update(req.body)
           .eq('id', taskId)
           .eq('user_id', user.id)
           .select()
@@ -210,22 +207,17 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        return res.status(200).json(data)
       }
 
       case 'DELETE': {
-        const url = new URL(req.url)
-        const taskId = url.searchParams.get('id')
-        
+        const taskId = req.query.id as string
+
         if (!taskId) {
-          throw new Error('Task ID is required')
+          return res.status(400).json({ error: 'Task ID is required' })
         }
 
-        console.log('DELETE task:', taskId)
-
+        // Try to delete the task
         const { error } = await supabaseClient
           .from('tasks')
           .delete()
@@ -237,27 +229,14 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        return res.status(204).end()
       }
 
       default:
-        throw new Error(`Method ${req.method} not allowed`)
+        return res.status(405).json({ error: 'Method not allowed' })
     }
   } catch (error) {
     console.error('Error:', error)
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+    return res.status(500).json({ error: 'Internal server error' })
   }
-}) 
+}

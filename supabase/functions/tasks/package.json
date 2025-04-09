@@ -1,0 +1,25 @@
+{
+  "name": "tasks-function",
+  "version": "1.0.0",
+  "description": "Tasks Edge Function",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.10",
+    "@vercel/node": "^3.0.0",
+    "typescript": "^5.6.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.3.1",
+    "@types/jest": "^29.5.14"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+} 

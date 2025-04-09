@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createServer } from 'http';
+import { createClient } from '@supabase/supabase-js';
+import { corsHeaders } from '../_shared/cors';
 
 interface Note {
   id?: string
@@ -14,30 +14,38 @@ interface Note {
   updated_at?: string
 }
 
-serve(async (req) => {
+createServer(async (req, res) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    res.writeHead(200, corsHeaders)
+    res.end()
+    return
   }
 
   try {
     // Log request details
-    console.log('Request method:', req.method)
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
+    console.log('Request method:', req.method);
+    console.log('Request headers:', req.headers);
     
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseUrl = process.env.SUPABASE_URL || 'default_url';
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'default_key';
     
     console.log('Supabase URL:', supabaseUrl)
     console.log('Supabase Anon Key exists:', !!supabaseAnonKey)
 
+    // Get the authorization header
+    const authHeader = req.headers['authorization'] || '';
+
+    // Ensure req.url is defined before using it
+    const url = req.url ? new URL(req.url) : new URL('http://default');
+
     // Create a Supabase client with the Auth context of the logged in user
     const supabaseClient = createClient(
-      supabaseUrl ?? '',
-      supabaseAnonKey ?? '',
+      supabaseUrl,
+      supabaseAnonKey,
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     )
@@ -73,7 +81,6 @@ serve(async (req) => {
     switch (req.method) {
       case 'GET': {
         // Parse query parameters
-        const url = new URL(req.url)
         const search_term = url.searchParams.get('search_term') || undefined
         const contact_id = url.searchParams.get('contact_id') || undefined
         const task_id = url.searchParams.get('task_id') || undefined
@@ -130,85 +137,92 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(
-          JSON.stringify({
-            data,
-            total: count || 0,
-            page,
-            per_page,
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        )
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          data,
+          total: count || 0,
+          page,
+          per_page,
+        }))
       }
 
       case 'POST': {
-        const body = await req.json()
-        
-        console.log('POST body:', body)
+        // Ensure req is defined and has the necessary methods
+        if (req && typeof req.on === 'function') {
+          const body = await new Promise<string>((resolve, reject) => {
+            let data = '';
+            req.on('data', chunk => {
+              data += chunk;
+            });
+            req.on('end', () => {
+              resolve(data);
+            });
+            req.on('error', reject);
+          });
 
-        // Validate required fields
-        if (!body.title || !body.content) {
-          throw new Error('Title and content are required')
+          // Ensure the body is parsed correctly into an object
+          const parsedBody = JSON.parse(body);
+          const noteData: Note = {
+            ...parsedBody,
+            user_id: user.id,
+            contact_id: parsedBody.contact_id || null,
+            task_id: parsedBody.task_id || null,
+            project_id: parsedBody.project_id || null,
+          };
+
+          console.log('Creating note:', noteData)
+
+          // First, check if we can query the notes table
+          const { error: checkError } = await supabaseClient
+            .from('notes')
+            .select('id')
+            .limit(1)
+
+          if (checkError) {
+            console.error('Table access error:', checkError)
+            throw new Error(`Table access error: ${checkError.message}`)
+          }
+
+          // Try to insert the note
+          const { data, error } = await supabaseClient
+            .from('notes')
+            .insert([noteData])
+            .select()
+            .single()
+
+          if (error) {
+            console.error('Database error:', error)
+            throw new Error(`Database error: ${error.message}`)
+          }
+
+          console.log('Note created successfully:', data)
+
+          res.writeHead(201, { ...corsHeaders, 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(data))
         }
-
-        // Convert empty strings to null for UUID fields
-        const noteData: Note = {
-          ...body,
-          user_id: user.id,
-          contact_id: body.contact_id || null,
-          task_id: body.task_id || null,
-          project_id: body.project_id || null,
-        }
-
-        console.log('Creating note:', noteData)
-
-        // First, check if we can query the notes table
-        const { error: checkError } = await supabaseClient
-          .from('notes')
-          .select('id')
-          .limit(1)
-
-        if (checkError) {
-          console.error('Table access error:', checkError)
-          throw new Error(`Table access error: ${checkError.message}`)
-        }
-
-        // Try to insert the note
-        const { data, error } = await supabaseClient
-          .from('notes')
-          .insert([noteData])
-          .select()
-          .single()
-
-        if (error) {
-          console.error('Database error:', error)
-          throw new Error(`Database error: ${error.message}`)
-        }
-
-        console.log('Note created successfully:', data)
-
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 201,
-        })
       }
 
       case 'PUT': {
-        const url = new URL(req.url)
         const noteId = url.searchParams.get('id')
         
         if (!noteId) {
           throw new Error('Note ID is required')
         }
 
-        const body = await req.json()
-        console.log('PUT body:', { id: noteId, ...body })
+        const body = await new Promise<string>((resolve, reject) => {
+          let data = '';
+          req.on('data', chunk => {
+            data += chunk;
+          });
+          req.on('end', () => {
+            resolve(data);
+          });
+          req.on('error', reject);
+        });
+        console.log('PUT body:', { id: noteId, ...JSON.parse(body) })
 
         // Clean up the data - convert empty strings to null for optional fields
-        const cleanedBody = Object.entries(body).reduce((acc, [key, value]) => {
+        const cleanedBody = Object.entries(JSON.parse(body)).reduce((acc, [key, value]) => {
           // Convert empty strings to null
           if (value === '') {
             acc[key] = null;
@@ -233,14 +247,11 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify(data), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(data))
       }
 
       case 'DELETE': {
-        const url = new URL(req.url)
         const noteId = url.searchParams.get('id')
         
         if (!noteId) {
@@ -260,10 +271,8 @@ serve(async (req) => {
           throw new Error(`Database error: ${error.message}`)
         }
 
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        })
+        res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: true }))
       }
 
       default:
@@ -271,16 +280,11 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error:', error)
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+    res.writeHead(400, { ...corsHeaders, 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    }))
   }
-}) 
+}).listen(8080) 

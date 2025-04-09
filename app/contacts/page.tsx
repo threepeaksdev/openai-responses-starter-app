@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Search, Plus, Filter, Edit2, X } from "lucide-react";
 import { Contact } from "@/app/api/types";
 import { useDataFetch } from "@/lib/hooks/use-data-fetch";
-import { createClient } from "@/lib/supabase/client";
 
 // Update Contact type to include relationship_status
 interface ContactWithStatus extends Contact {

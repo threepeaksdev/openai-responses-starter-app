@@ -4,7 +4,6 @@ import {
   handleCreateContact,
   handleUpdateContact,
   handleDeleteContact,
-  handleGetContact
 } from '../functions/contacts/handler'
 
 export async function GET(req: NextRequest) {

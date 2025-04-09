@@ -16,7 +16,6 @@ function formatContent(content: string | null, maxLength: number = 150): string 
 }
 
 export default function NotesPage() {
-  const supabase = createClientComponentClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<Note['type']>();
   const [selectedStatus, setSelectedStatus] = useState<Note['status']>();

@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const page = parseInt(searchParams.get('page') || '1');
   const per_page = parseInt(searchParams.get('per_page') || '10');
 
-  const supabase = createClient(cookies());
+  const supabase = await createClient();
   let query = supabase
     .from('notes')
     .select('*');
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const note = await request.json();
-  const supabase = createClient(cookies());
+  const supabase = await createClient();
   
   const { data, error } = await supabase
     .from('notes')
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   const { id, ...updates } = await request.json();
-  const supabase = createClient(cookies());
+  const supabase = await createClient();
   
   const { data, error } = await supabase
     .from('notes')
@@ -98,7 +98,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'ID is required' }, { status: 400 });
   }
 
-  const supabase = createClient(cookies());
+  const supabase = await createClient();
   
   const { error } = await supabase
     .from('notes')

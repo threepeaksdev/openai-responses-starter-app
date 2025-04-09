@@ -190,6 +190,18 @@ export async function edit_note({ note_id, ...updates }: any) {
   return response.json();
 }
 
+export async function delete_note(note_id: string) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `https://${projectRef}.supabase.co/functions/v1/notes?id=${note_id}`,
+    {
+      method: 'DELETE',
+      headers,
+    }
+  );
+  return response.json();
+}
+
 export async function get_projects(params: any = {}) {
   const queryParams = new URLSearchParams();
   
@@ -383,6 +395,7 @@ export const functionsMap = {
   get_contacts,
   create_contact,
   update_contact,
+  edit_contact: update_contact,
   delete_contact,
   get_tasks,
   create_task,
@@ -390,6 +403,7 @@ export const functionsMap = {
   get_notes,
   create_note,
   edit_note,
+  delete_note,
   get_projects,
   create_project,
   edit_project,

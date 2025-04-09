@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Filter } from "lucide-react";
+import { Search, Plus, Filter, Edit2, X } from "lucide-react";
 import { Contact } from "@/app/api/types";
 import { useDataFetch } from "@/lib/hooks/use-data-fetch";
+import { createClient } from "@/lib/supabase/client";
+
+// Update Contact type to include relationship_status
+interface ContactWithStatus extends Contact {
+  relationship_status?: string;
+}
 
 export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -11,14 +17,67 @@ export default function ContactsPage() {
   const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'created_at' | 'updated_at'>('updated_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<ContactWithStatus | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const { data: contacts, loading, error } = useDataFetch<Contact>({
+  const { data: contacts, loading, error, mutate } = useDataFetch<ContactWithStatus>({
     endpoint: 'functions/contacts',
     searchTerm,
     tags: selectedTags,
     sortBy,
     sortOrder
   });
+
+  const handleUpdateContact = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingContact) return;
+
+    try {
+      const formData = new FormData(e.currentTarget);
+      const updates = {
+        first_name: formData.get('first_name'),
+        last_name: formData.get('last_name'),
+        email: formData.get('email'),
+        phone: formData.get('phone'),
+        company: formData.get('company'),
+        location: formData.get('location'),
+        relationship_status: formData.get('relationship_status'),
+      };
+
+      console.log('Starting contact update:', {
+        contactId: editingContact.id,
+        updates
+      });
+
+      const response = await fetch(`/api/contacts?id=${editingContact.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      console.log('Response status:', response.status);
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
+
+      if (!response.ok) {
+        const errorMessage = responseData.error || `HTTP error! status: ${response.status}`;
+        console.error('Update failed:', errorMessage, responseData);
+        throw new Error(errorMessage);
+      }
+
+      console.log('Update successful:', responseData);
+
+      // Refresh the contacts list
+      mutate();
+      setIsEditModalOpen(false);
+      setEditingContact(null);
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update contact. Please try again.');
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -119,6 +178,15 @@ export default function ContactsPage() {
                     <tr key={contact.id} className="hover:bg-gray-50">
                       <td className="py-3 px-4">
                         {contact.first_name} {contact.last_name}
+                        <button
+                          onClick={() => {
+                            setEditingContact(contact);
+                            setIsEditModalOpen(true);
+                          }}
+                          className="ml-2 text-gray-500 hover:text-gray-700"
+                        >
+                          <Edit2 size={16} />
+                        </button>
                       </td>
                       <td className="py-3 px-4">{contact.email || '-'}</td>
                       <td className="py-3 px-4">{contact.phone || '-'}</td>
@@ -142,6 +210,139 @@ export default function ContactsPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Contact Modal */}
+      {isEditModalOpen && editingContact && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Edit Contact</h2>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingContact(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateContact} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  name="first_name"
+                  defaultValue={editingContact.first_name}
+                  required
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  name="last_name"
+                  defaultValue={editingContact.last_name}
+                  required
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  defaultValue={editingContact.email || ''}
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  defaultValue={editingContact.phone || ''}
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company
+                </label>
+                <input
+                  type="text"
+                  name="company"
+                  defaultValue={editingContact.company || ''}
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  defaultValue={editingContact.location || ''}
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Relationship Status
+                </label>
+                <select
+                  name="relationship_status"
+                  defaultValue={editingContact.relationship_status || ''}
+                  className="w-full border border-gray-200 rounded-lg p-2"
+                >
+                  <option value="">Select status</option>
+                  <option value="friend">Friend</option>
+                  <option value="family">Family</option>
+                  <option value="colleague">Colleague</option>
+                  <option value="acquaintance">Acquaintance</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingContact(null);
+                  }}
+                  className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

@@ -137,10 +137,21 @@ serve(async (req) => {
           throw new Error('First name and last name are required')
         }
 
+        // Clean up the data - convert empty strings to null for optional fields
+        const cleanedBody = Object.entries(body).reduce((acc, [key, value]) => {
+          // Convert empty strings to null
+          if (value === '') {
+            acc[key] = null;
+          } else {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as Record<string, any>);
+
         const contactData: Contact = {
-          ...body,
+          ...cleanedBody,
           user_id: user.id,
-        }
+        };
 
         console.log('Creating contact:', contactData)
 

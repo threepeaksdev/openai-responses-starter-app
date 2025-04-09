@@ -1,23 +1,10 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { Database } from '@/types/supabase'
 
-interface Note {
-  id?: string
-  title: string
-  content: string
-  contact_id?: string
-  task_id?: string
-  project_id?: string
-  type: 'general' | 'contact' | 'task' | 'project'
-  status: 'active' | 'archived'
-  priority?: 'low' | 'medium' | 'high'
-  tags?: string[]
-  user_id: string
-  created_at?: string
-  updated_at?: string
-}
+export type Note = Database['public']['Tables']['notes']['Row']
 
-interface NoteResult {
+export interface NoteResponse {
   success: boolean
   note?: Note
   error?: string
@@ -118,7 +105,7 @@ export async function handleGetNotes(params: GetNotesParams = {}) {
   }
 }
 
-export async function handleCreateNote(noteData: Note): Promise<NoteResult> {
+export async function handleCreateNote(noteData: Partial<Note>): Promise<NoteResponse> {
   try {
     const supabase = createRouteHandlerClient({ cookies })
     
@@ -151,21 +138,17 @@ export async function handleUpdateNote({
   ...updates
 }: {
   note_id: string
-} & Partial<Note>): Promise<NoteResult> {
+} & Partial<Note>): Promise<NoteResponse> {
   try {
     const supabase = createRouteHandlerClient({ cookies })
     
-    // Get user from session to ensure ownership
+    // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     if (authError || !session) {
-      return {
-        success: false,
-        error: 'Unauthorized'
-      }
+      return { success: false, error: 'Unauthorized' }
     }
 
-    // Update the note
-    const { data, error } = await supabase
+    const { data: note, error } = await supabase
       .from('notes')
       .update(updates)
       .eq('id', note_id)
@@ -177,36 +160,33 @@ export async function handleUpdateNote({
       throw error
     }
 
-    return {
-      success: true,
-      note: data
-    }
+    return { success: true, note }
   } catch (error) {
     console.error('Error in handleUpdateNote:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     }
   }
 }
 
-export async function handleDeleteNote(id: string): Promise<boolean> {
+export async function handleDeleteNote(noteId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createRouteHandlerClient({ cookies })
     
     const { error } = await supabase
       .from('notes')
       .delete()
-      .eq('id', id)
+      .eq('id', noteId)
 
     if (error) {
       throw error
     }
 
-    return true
+    return { success: true }
   } catch (error) {
     console.error('Error in handleDeleteNote:', error)
-    throw error
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 

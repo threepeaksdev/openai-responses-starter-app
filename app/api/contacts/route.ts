@@ -1,167 +1,108 @@
-import { NextResponse } from 'next/server';
-import type { Database } from '@/types/supabase';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server'
+import {
+  handleGetContacts,
+  handleCreateContact,
+  handleUpdateContact,
+  handleDeleteContact,
+  handleGetContact
+} from '../functions/contacts/handler'
 
-type Contact = Database['public']['Tables']['contacts']['Row'];
-
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const search_term = searchParams.get('search_term') || undefined;
-    const tags = searchParams.get('tags')?.split(',') || undefined;
-    const sort_by = searchParams.get('sort_by') as 'first_name' | 'last_name' | 'created_at' | 'updated_at' || 'updated_at';
-    const sort_order = searchParams.get('sort_order') as 'asc' | 'desc' || 'desc';
-    const page = parseInt(searchParams.get('page') || '1');
-    const per_page = parseInt(searchParams.get('per_page') || '10');
-
-    const supabase = await createClient();
-    
-    // Get user from session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { searchParams } = new URL(req.url)
+    const params = {
+      search_term: searchParams.get('search_term') || undefined,
+      tags: searchParams.get('tags')?.split(',') || undefined,
+      sort_by: searchParams.get('sort_by') as any || undefined,
+      sort_order: searchParams.get('sort_order') as 'asc' | 'desc' | undefined,
+      page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : undefined,
+      per_page: searchParams.get('per_page') ? parseInt(searchParams.get('per_page')!) : undefined,
     }
 
-    let query = supabase
-      .from('contacts')
-      .select('*')
-      .eq('user_id', session.user.id);
-
-    if (search_term) {
-      query = query.or(
-        `first_name.ilike.%${search_term}%,last_name.ilike.%${search_term}%,email.ilike.%${search_term}%`
-      );
-    }
-
-    if (tags) {
-      query = query.contains('tags', tags);
-    }
-
-    query = query.order(sort_by, { ascending: sort_order === 'asc' });
-
-    const start = (page - 1) * per_page;
-    query = query.range(start, start + per_page - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) throw error;
-
-    return NextResponse.json({
-      contacts: data,
-      total: count || 0,
-      page,
-      per_page
-    });
+    const result = await handleGetContacts(params)
+    return NextResponse.json(result)
   } catch (error) {
-    console.error('Error in GET /api/contacts:', error);
+    console.error('GET /api/contacts error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
+    )
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const body = await req.json()
+    const result = await handleCreateContact(body)
     
-    // Get user from session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: 400 }
+      )
     }
 
-    const body = await request.json();
-    const contact: Partial<Contact> = {
-      ...body,
-      user_id: session.user.id,
-    };
-
-    const { data, error } = await supabase
-      .from('contacts')
-      .insert([contact])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json(data);
+    return NextResponse.json(result.contact, { status: 201 })
   } catch (error) {
-    console.error('Error in POST /api/contacts:', error);
+    console.error('POST /api/contacts error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
+    )
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(req: NextRequest) {
   try {
-    const supabase = await createClient();
+    const { searchParams } = new URL(req.url)
+    const contact_id = searchParams.get('id')
     
-    // Get user from session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!contact_id) {
+      return NextResponse.json(
+        { error: 'Contact ID is required' },
+        { status: 400 }
+      )
     }
 
-    const { id, ...updates } = await request.json();
+    const updates = await req.json()
+    const result = await handleUpdateContact({ contact_id, ...updates })
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(result.contact)
+  } catch (error) {
+    console.error('PUT /api/contacts error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
     
     if (!id) {
-      return NextResponse.json({ error: 'Contact ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Contact ID is required' },
+        { status: 400 }
+      )
     }
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .update(updates)
-      .eq('id', id)
-      .eq('user_id', session.user.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json(data);
+    await handleDeleteContact(id)
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in PUT /api/contacts:', error);
+    console.error('DELETE /api/contacts error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(request: Request) {
-  try {
-    const supabase = await createClient();
-    
-    // Get user from session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json({ error: 'ID is required' }, { status: 400 });
-    }
-
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', session.user.id);
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error in DELETE /api/contacts:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    )
   }
 } 

@@ -207,9 +207,22 @@ serve(async (req) => {
         const body = await req.json()
         console.log('PUT body:', { id: noteId, ...body })
 
+        // Clean up the data - convert empty strings to null for optional fields
+        const cleanedBody = Object.entries(body).reduce((acc, [key, value]) => {
+          // Convert empty strings to null
+          if (value === '') {
+            acc[key] = null;
+          } else {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as Record<string, any>);
+
+        console.log('Cleaned PUT body:', cleanedBody)
+
         const { data, error } = await supabaseClient
           .from('notes')
-          .update(body)
+          .update(cleanedBody)
           .eq('id', noteId)
           .eq('user_id', user.id)
           .select()

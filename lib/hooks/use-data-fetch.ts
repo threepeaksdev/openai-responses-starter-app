@@ -110,9 +110,13 @@ export function useDataFetch<T>({
     supabase.auth
   ]);
 
-  useEffect(() => {
+  const mutate = useCallback(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [supabase.auth, fetchData]);
 
   useEffect(() => {
     const {
@@ -126,5 +130,5 @@ export function useDataFetch<T>({
     };
   }, [supabase.auth, fetchData]);
 
-  return { data, loading, error };
+  return { data, loading, error, mutate };
 } 

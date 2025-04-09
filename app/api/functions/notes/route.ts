@@ -1,20 +1,14 @@
 import { NextResponse } from 'next/server'
-import type { Database } from '@/types/supabase'
-import { createClient } from '@/lib/supabase/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { handleCreateNote, handleUpdateNote, handleDeleteNote, Note } from './handler'
 
-type Note = Database['public']['Tables']['notes']['Row']
-
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    
     const { searchParams } = new URL(request.url)
     const noteId = searchParams.get('id')
-    const type = searchParams.get('type')
-    const status = searchParams.get('status')
+    
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -32,14 +26,24 @@ export async function GET(request: Request) {
       query = query.eq('id', noteId)
     }
 
-    // If type is provided, filter by type
-    if (type) {
-      query = query.eq('type', type)
+    // Apply search if provided
+    const search_term = searchParams.get('search_term')
+    if (search_term) {
+      query = query.or(
+        `title.ilike.%${search_term}%,content.ilike.%${search_term}%`
+      )
     }
 
-    // If status is provided, filter by status
+    // Apply status filter
+    const status = searchParams.get('status')
     if (status) {
       query = query.eq('status', status)
+    }
+
+    // Apply priority filter
+    const priority = searchParams.get('priority')
+    if (priority) {
+      query = query.eq('priority', priority)
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })
@@ -58,7 +62,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -67,32 +71,61 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const note: any = {
+    
+    // Add user_id to the note data
+    const noteData: Partial<Note> = {
       ...body,
-      user_id: session.user.id,
+      user_id: session.user.id
     }
 
-    const { data, error } = await supabase
-      .from('notes')
-      .insert([note])
-      .select()
-      .single()
+    const result = await handleCreateNote(noteData)
 
-    if (error) throw error
+    if (!result.success) {
+      throw new Error(result.error)
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json(result.note)
   } catch (error) {
-    console.error('Error in create note route:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    })
+    console.error('Error in POST /api/functions/notes:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
   }
 }
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient()
+    const { searchParams } = new URL(request.url)
+    const noteId = searchParams.get('id')
+    
+    if (!noteId) {
+      return NextResponse.json({ error: 'Note ID is required' }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const result = await handleUpdateNote({
+      note_id: noteId,
+      ...body
+    })
+
+    if (!result.success) {
+      throw new Error(result.error)
+    }
+
+    return NextResponse.json(result.note)
+  } catch (error) {
+    console.error('Error in PUT /api/functions/notes:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
     
     // Get user from session
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -107,23 +140,18 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Note ID is required' }, { status: 400 })
     }
 
-    const body = await request.json()
-    const { data, error } = await supabase
-      .from('notes')
-      .update(body)
-      .eq('id', noteId)
-      .eq('user_id', session.user.id)
-      .select()
-      .single()
+    const result = await handleDeleteNote(noteId)
 
-    if (error) throw error
+    if (!result.success) {
+      throw new Error(result.error)
+    }
 
-    return NextResponse.json(data)
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in update note route:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    })
+    console.error('Error in DELETE /api/functions/notes:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
   }
 } 

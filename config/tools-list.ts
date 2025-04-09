@@ -153,7 +153,7 @@ export const toolsList = [
     name: "edit_contact",
     description: "Update an existing contact's information",
     parameters: {
-      contact_id: {
+      id: {
         type: "string",
         description: "ID of the contact to edit"
       },
@@ -165,10 +165,6 @@ export const toolsList = [
         type: "string",
         description: "New last name of the contact"
       },
-      nickname: {
-        type: "string",
-        description: "New nickname of the contact"
-      },
       email: {
         type: "string",
         description: "New email address of the contact"
@@ -176,14 +172,6 @@ export const toolsList = [
       phone: {
         type: "string",
         description: "New phone number of the contact"
-      },
-      birthday: {
-        type: "string",
-        description: "New birthday of the contact in YYYY-MM-DD format"
-      },
-      occupation: {
-        type: "string",
-        description: "New occupation or job title of the contact"
       },
       company: {
         type: "string",
@@ -193,52 +181,17 @@ export const toolsList = [
         type: "string",
         description: "New location or address of the contact"
       },
-      linkedin: {
-        type: "string",
-        description: "New LinkedIn profile URL of the contact"
-      },
-      twitter: {
-        type: "string",
-        description: "New Twitter handle or profile URL of the contact"
-      },
-      instagram: {
-        type: "string",
-        description: "New Instagram handle or profile URL of the contact"
-      },
       relationship_status: {
         type: "string",
-        description: "New type of relationship with the contact",
+        description: "Type of relationship with the contact",
         enum: ["friend", "family", "colleague", "acquaintance", "other"]
-      },
-      met_at: {
-        type: "string",
-        description: "New information about where you met the contact"
-      },
-      met_through: {
-        type: "string",
-        description: "New information about who introduced you to the contact"
-      },
-      bio: {
-        type: "string",
-        description: "New biography or description of the contact"
-      },
-      interests: {
-        type: "array",
-        items: {
-          type: "string"
-        },
-        description: "New list of interests or hobbies of the contact"
       },
       tags: {
         type: "array",
         items: {
           type: "string"
         },
-        description: "New list of tags to categorize the contact"
-      },
-      notes: {
-        type: "string",
-        description: "New additional notes about the contact"
+        description: "List of tags to categorize the contact"
       }
     }
   },

@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Search, Plus, Filter } from "lucide-react";
 import { Database } from "@/types/supabase";
 import { useDataFetch } from "@/lib/hooks/use-data-fetch";
+import NoteDetailsModal from "../components/NoteDetailsModal";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { edit_note, delete_note } from '@/config/functions';
 
 type Note = Database['public']['Tables']['notes']['Row'];
 
@@ -13,6 +16,7 @@ function formatContent(content: string | null, maxLength: number = 150): string 
 }
 
 export default function NotesPage() {
+  const supabase = createClientComponentClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<Note['type']>();
   const [selectedStatus, setSelectedStatus] = useState<Note['status']>();
@@ -21,8 +25,9 @@ export default function NotesPage() {
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'updated_at' | 'priority'>('updated_at');
   const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
-  const { data: notes, loading, error } = useDataFetch<Note>({
+  const { data: notes, loading, error, mutate } = useDataFetch<Note>({
     endpoint: 'functions/notes',
     searchTerm,
     type: selectedType,
@@ -32,6 +37,42 @@ export default function NotesPage() {
     sortBy,
     sortOrder
   });
+
+  const handleEditNote = async (updatedNote: Note) => {
+    try {
+      console.log('Updating note with data:', updatedNote);
+      
+      // Only include fields that are in the database schema
+      const { id, title, content, type, status, priority, tags } = updatedNote;
+      const noteData = { note_id: id, title, content, type, status, priority, tags };
+      
+      console.log('Cleaned note data:', noteData);
+
+      const result = await edit_note(noteData);
+      console.log('Note updated successfully:', result);
+
+      // Refresh the notes list
+      mutate();
+      setSelectedNote(null);
+    } catch (error) {
+      console.error('Error updating note:', error);
+      // You might want to show an error message to the user here
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    try {
+      const result = await delete_note(noteId);
+      console.log('Note deleted successfully:', result);
+
+      // Refresh the notes list
+      mutate();
+      setSelectedNote(null);
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      // You might want to show an error message to the user here
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -138,7 +179,11 @@ export default function NotesPage() {
             </div>
           ) : (
             notes?.map((note) => (
-              <div key={note.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+              <div
+                key={note.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => setSelectedNote(note)}
+              >
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <h3 className="text-lg font-medium text-gray-900 line-clamp-2">{note.title}</h3>
@@ -192,6 +237,16 @@ export default function NotesPage() {
           )}
         </div>
       </div>
+
+      {selectedNote && (
+        <NoteDetailsModal
+          note={selectedNote}
+          isOpen={!!selectedNote}
+          onClose={() => setSelectedNote(null)}
+          onEdit={handleEditNote}
+          onDelete={handleDeleteNote}
+        />
+      )}
     </div>
   );
 } 

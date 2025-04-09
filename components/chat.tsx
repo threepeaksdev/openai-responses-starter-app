@@ -15,27 +15,36 @@ interface ChatProps {
 const Chat: React.FC<ChatProps> = ({ items, onSendMessage, isProcessing = false }) => {
   const itemsEndRef = useRef<HTMLDivElement>(null);
   const [inputMessageText, setinputMessageText] = useState<string>("");
-  // This state is used to provide better user experience for non-English IMEs such as Japanese
   const [isComposing, setIsComposing] = useState(false);
 
   const scrollToBottom = () => {
     itemsEndRef.current?.scrollIntoView({ behavior: "instant" });
   };
 
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey && !isComposing && !isProcessing) {
-      event.preventDefault();
-      onSendMessage(inputMessageText);
-      setinputMessageText("");
-    }
-  }, [onSendMessage, inputMessageText, isProcessing, isComposing]);
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !isComposing &&
+        !isProcessing
+      ) {
+        event.preventDefault();
+        onSendMessage(inputMessageText);
+        setinputMessageText("");
+      }
+    },
+    [onSendMessage, inputMessageText, isProcessing, isComposing]
+  );
 
   useEffect(() => {
     scrollToBottom();
   }, [items]);
 
   return (
+    // 1) Make this container flex with full height
     <div className="flex flex-col h-full">
+      {/* 2) Put messages in a flex-1 scroll area */}
       <div className="flex-1 overflow-y-auto pb-4">
         <div className="max-w-3xl mx-auto px-4 pt-4 space-y-6">
           {items.map((item, index) => (
@@ -59,7 +68,9 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage, isProcessing = false 
           <div ref={itemsEndRef} />
         </div>
       </div>
-      <div className="sticky bottom-0 border-t border-gray-200 bg-white/80 backdrop-blur-sm">
+
+      {/* 3) Input pinned at bottom by flex layout (no sticky needed) */}
+      <div className="border-t border-gray-200 bg-white/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="relative">
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm hover:border-gray-300 transition-colors">
@@ -73,18 +84,17 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage, isProcessing = false 
                   value={inputMessageText}
                   onChange={(e) => {
                     setinputMessageText(e.target.value);
-                    // Auto-adjust height
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+                    e.target.style.height = "auto";
+                    e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px";
                   }}
                   onKeyDown={handleKeyDown}
                   onCompositionStart={() => setIsComposing(true)}
                   onCompositionEnd={() => setIsComposing(false)}
                   disabled={isProcessing}
                   style={{
-                    height: 'auto',
-                    maxHeight: '200px',
-                    overflowY: 'auto'
+                    height: "auto",
+                    maxHeight: "200px",
+                    overflowY: "auto",
                   }}
                 />
                 <div className="flex items-center gap-2 pl-2">
@@ -115,7 +125,7 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage, isProcessing = false 
             </div>
           </div>
         </div>
-      </div>
+      </div>  
     </div>
   );
 };

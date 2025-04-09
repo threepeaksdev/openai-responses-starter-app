@@ -5,7 +5,6 @@ import { Search, Plus, Filter } from "lucide-react";
 import { Database } from "@/types/supabase";
 import { useDataFetch } from "@/lib/hooks/use-data-fetch";
 import NoteDetailsModal from "../components/NoteDetailsModal";
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { edit_note, delete_note } from '@/config/functions';
 
 type Note = Database['public']['Tables']['notes']['Row'];
